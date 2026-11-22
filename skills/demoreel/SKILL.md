@@ -31,7 +31,10 @@ installing this skill does not install the tool.
 6. **Voice, if the person will record it.** [Booth](https://github.com/phin-tech/booth) opens the folder, plays each
    exported scene beside its script and records takes to `audio/`; the take it marks is written to `audio/takes.json`
    and demoreel uses it as the scene's audio (a scene's own `audio` file wins). Rebuild to fit the scenes to the audio.
-7. **A deck, if they want to click through it.** `demoreel present <folder>` serves the same scenes as a slideshow
+7. **A timeline, if they want to finish in an editor.** `demoreel timeline <folder>` (after `export`) writes
+   `out/timeline/`: an FCPXML for DaVinci Resolve or Final Cut with the scenes silent on one track and each voice under
+   its scene. It has not been opened in those apps, so ask the person to try it and report any import error.
+8. **A deck, if they want to click through it.** `demoreel present <folder>` serves the same scenes as a slideshow
    (bullets one per press, narration as notes; a `branch` scene reached from a card's `link`). It stays running; stop it
    when done.
 

@@ -212,6 +212,21 @@ than the scene's title goes in the card's `"linkLabel"`.
 The deck is for presenting from your machine. Nothing here makes a file you can send, and `hyperframes share` and
 `publish` upload to HeyGen, so demoreel doesn't use them.
 
+### A timeline for DaVinci Resolve or Final Cut
+
+```bash
+demoreel export my-demo     # the scenes first
+demoreel timeline my-demo   # then out/timeline/
+```
+
+`out/timeline/` holds an `.fcpxml` and the media it points at: each scene's video on the main track (silent), and each
+recorded voice on an audio track under its scene, starting where demoreel starts it. In DaVinci Resolve, which is free,
+use File > Import > Timeline; in Final Cut, File > Import > XML. `captions.srt` is there to import as subtitles.
+
+This is written as FCPXML 1.8 and checked only for well-formedness, not opened in Resolve or Final Cut, so if one
+refuses the file, its error message is what to look at. The file points at its media by path: keep the folder where it
+is, or relink the clips after moving it.
+
 ## The files other tools can rely on
 
 demoreel and [Booth](https://github.com/phin-tech/booth) (a Mac app for recording narration) share three files and nothing
@@ -248,7 +263,7 @@ Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `link`, `linkLabel`, `zoom` (
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
 fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
 
-Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `deck`; `present`.
+Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `timeline`; `deck`; `present`.
 
 ## Troubleshooting
 
