@@ -73,6 +73,7 @@ Recording permission and a visible window, and iOS needs a simulator set up firs
   driver also has no scroll or drag step yet.
 - Swift capture is unproven. If a window can only be captured with the Screen Recording permission, that driver cannot
   run hidden or unattended.
-- What has been run: the Typecase driver and `demoreel record` on Typecase's `driven` example, hidden, end to end into a
-  rendered clip scene, looking at still frames and not the motion. The web, Swift, iOS and Accessibility drivers are
-  designs only.
+- What has been run: the Typecase driver and `demoreel record` on Typecase's `driven` example, and the web driver on a
+  small local page, each hidden, end to end into a rendered clip scene, looking at still frames and not the motion.
+  The web driver has not been tried on a real site or a page served over HTTP. The Swift, iOS and Accessibility
+  drivers are designs only.

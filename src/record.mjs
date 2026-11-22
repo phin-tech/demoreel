@@ -17,7 +17,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** Runs one scene's `record` block and returns the files it wrote. */
 export async function record(dir, scene, { log = console.log } = {}) {
   const r = scene.record;
-  if ((r.driver ?? "typecase") !== "typecase") throw new Error(`scene ${scene.id}: driver "${r.driver}" is not one demoreel can run yet (typecase)`);
+  if (r.driver === "web") return (await import("./web.mjs")).recordWeb(dir, scene, { log });
+  if ((r.driver ?? "typecase") !== "typecase") throw new Error(`scene ${scene.id}: driver "${r.driver}" is not one demoreel can run yet (typecase, web)`);
   if (!r.command?.length) throw new Error(`scene ${scene.id}: record.command is the app to start`);
   if (!r.script) throw new Error(`scene ${scene.id}: record.script is the file of steps to run`);
   const fps = r.fps ?? 30;

@@ -131,6 +131,23 @@ say it), and quits the app. `--scene <id>` records one scene. Options: `socketEn
 to listen, default `TYPECASE_DRIVER_SOCKET`), `env`, `fps` (30). Nothing takes focus and no screen recording
 permission is needed. The design is in `docs/adr/0001-drivers-share-one-recording-contract.md`.
 
+**A website works the same way.** `"driver": "web"` drives a page in headless Chrome (the one HyperFrames uses) and
+needs nothing running but the page:
+
+```json
+{ "type": "clip", "id": "notes",
+  "record": { "driver": "web", "url": "page.html", "script": "web.script",
+              "viewport": { "width": 1000, "height": 640 } } }
+```
+
+`url` is a web address (start your dev server first) or a file next to `demo.json`. The script has the same lines as
+the Typecase driver, for a page: `click #note` (a selector) or `click Add note` (the text of a button or link),
+`click:X,Y`, `move:X,Y` (hover), `type some words`, `enter` or `cmd-k` (a key), `scroll:X,Y,DY`, `goto:URL`, `wait:600`;
+`#` starts a comment line. Frames are taken at 2x (`"scale"` changes it) while the script runs and made into a steady
+30fps, and events are written in pixels of the page. Chrome comes from `npx hyperframes browser path`, or set
+`DEMOREEL_CHROME` to a Chrome binary. `page.screenshot` takes focus from the page it films, so the driver captures with
+the DevTools protocol directly.
+
 **No way to record your app?** Any screen recording works. Record it with QuickTime, with the cursor hidden if you can, and
 write the events by hand: watch the video, note the frame of each click or key (frames = seconds × 30), and read the
 coordinates off a screenshot of the same window. It is fiddly the first time and quick after that.
