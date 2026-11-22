@@ -76,6 +76,9 @@ Add `"zoom": { "to": 1.25, "origin": "70% 30%", "at": 2.4, "duration": 2.4 }` to
 (`origin` is the point it zooms toward, `at` is when it starts, in seconds). Keep `to` near 1.25 for a 2560px-wide
 screenshot; more than that and it goes soft.
 
+Add `"tilt": -35` to a card (degrees; negative turns it from the right, positive from the left) and it lands by swinging
+to face you, ending flat so the text stays sharp. Try -20 for something subtler.
+
 One large card per scene reads better than several overlapping.
 
 ### A clip scene: the app being used
@@ -189,7 +192,7 @@ Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPe
 `scale` (2 is 4K, 1 is 1080p; `--hd` sets 1), `theme` (`accent`, `ink`, `muted`, `font`, `background`).
 
 `bullets` scene: `id`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
-Card: `image`, `x`, `y`, `width`, `delay`, `zoom` (`to`, `origin`, `at`, `duration`).
+Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `zoom` (`to`, `origin`, `at`, `duration`).
 
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
 fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
