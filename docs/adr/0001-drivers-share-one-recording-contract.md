@@ -24,10 +24,11 @@ and demoreel runs their commands.
 - **Frames or a video** at a fixed rate (30fps unless told otherwise), with no pointer and no key pill drawn into them.
   Frame files are numbered from `00000`, so the file number, the `frame` in an event and the index in an encoded video
   are the same number.
-- **`events.json`**, in the shape `README.md` ("The files other tools can rely on") describes:
-  `{"fps":30,"frames":N,"events":[{"frame":15,"kind":"key","key":"cmd-k"}, …]}`, with `kind` one of `key`, `click`,
-  `hover`, `scroll`, `drag`, and positions in the window's own units measured from its top-left corner (points for a
-  native window, CSS pixels for a page).
+- **`events.json`**, in the shape `README.md` ("The files other tools can rely on", the `events.json` entry) gives
+  field by field: `{"fps":30,"frames":N,"events":[{"frame":15,"kind":"key","key":"cmd-k"}, …]}`, with `kind` one of
+  `key`, `click`, `hover`, `scroll`, `drag`, and positions in the window's own units measured from its top-left corner
+  (points for a native window, CSS pixels for a page). `frame` indexes the delivered frames or video, so a driver that
+  resamples works it out from its timestamps.
 - **No focus taken and no window shown**, wherever the target allows it. A driver that cannot run hidden says so.
 
 Where a driver reads a script, it uses the lines Typecase's does (`click #id`, `click Label`, `type some words`, a key
@@ -37,10 +38,12 @@ name, `wait:600`, `move:X,Y`), so one script can run against whichever driver fi
 
 1. Typecase's `--events` recording, which writes exactly this and is built (`feat/driver-events`, not yet released),
    and moving Red Pen onto it in place of `REDPEN_RECORD`.
-2. A web driver inside demoreel, the cheapest and the most useful away from our own apps.
-3. A Swift driver in `apple-template`, after a test of how well a window can be captured, since that is the unknown.
-4. `demoreel record`, the single entrance: one adapter for Typecase's driver first, then the web driver, each filling in
-   a clip scene. After that, pacing a script from the words of recorded narration, which sits on top of any driver.
+2. `demoreel record`, the single entrance, with an adapter for Typecase's driver first since it works today. It owns the
+   process it launches (a driver that does not quit when asked is killed), keeps the driver's socket path short in a
+   temporary folder, and takes the window size from the driver when the scene does not give one.
+3. The web driver, inside demoreel and behind the same `record` block.
+4. A Swift driver in `apple-template`, after a test of how well a window can be captured, since that is the unknown.
+5. Pacing a script from the words of recorded narration, which sits on top of any driver.
 
 iOS and other Mac apps wait until something needs them. The Accessibility route needs Accessibility and Screen
 Recording permission and a visible window, and iOS needs a simulator set up first.

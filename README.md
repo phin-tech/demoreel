@@ -252,6 +252,24 @@ screenshot landing, a click, a key); `audioOffset` is how far into the scene the
 **`audio/takes.json`** (Booth writes it; demoreel reads it): `{ "01-queue": "01-queue-take-2.wav" }`, the take each scene
 uses, a file in `audio/`. A scene's own `audio` in `demo.json` wins over it.
 
+**`<clip>.events.json`** (a driver writes it, such as Red Pen's `just record` or Typecase's `typecase-drive --events`;
+demoreel reads it for a `clip` scene). Next to the frames of the clip, with `frame` the 0-based index of the frame an
+event starts on, the same number as the frame file (`00000.png`) and the index in the encoded video:
+
+```json
+{ "fps": 30, "frames": 165, "events": [
+  { "frame": 15,  "kind": "key",    "key": "cmd-k" },
+  { "frame": 38,  "kind": "click",  "x": 552, "y": 312, "held": "cmd-" },
+  { "frame": 50,  "kind": "hover",  "x": 40,  "y": 40 },
+  { "frame": 76,  "kind": "scroll", "x": 960, "y": 512, "dy": 500 },
+  { "frame": 90,  "kind": "drag",   "x": 100, "y": 200, "x2": 400, "y2": 200 } ] }
+```
+
+`x` and `y` are in the recorded window's own units, from its top-left; `held` on a click is the modifier written before
+it (`cmd-`, `right-`) and may be empty. demoreel uses `frame`, `kind`, `x`, `y` and `key` (a pointer glides to each event
+that has a position, a click gets a ring, a key gets a cap) and ignores the rest. Both field lists come from Red Pen's
+recorder (`crates/app/src/screenshot.rs`, `Recorder::note`), which is the reference.
+
 ## Reference
 
 Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPerMinute` (default 150), `fps` (30),
