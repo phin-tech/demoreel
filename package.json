@@ -9,6 +9,9 @@
   "bin": {
     "demoreel": "bin/demoreel.mjs"
   },
+  "scripts": {
+    "test": "node --test test/"
+  },
   "engines": {
     "node": ">=22"
   },

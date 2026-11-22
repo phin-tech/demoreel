@@ -28,6 +28,33 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const round = (n) => Math.round(n * 1000) / 1000;
 export const cleanNarration = (s = "") => s.replace(/\[[^\]]*\]\s*/g, "").replace(/\s+/g, " ").trim();
 
+/** Text split after each full stop, question mark or exclamation mark that ends a word (not the dot in "v1.2"). */
+export function sentences(text = "") {
+  const chars = [...cleanNarration(text)];
+  const out = [];
+  let cur = "";
+  chars.forEach((c, i) => {
+    cur += c;
+    if (/[.?!]/.test(c) && (i + 1 === chars.length || chars[i + 1] === " ")) {
+      out.push(cur.trim());
+      cur = "";
+    }
+  });
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
+/**
+ * The chunks of a narration: the pieces it is recorded, retaken and timed in. A line break ends a chunk, so a person says
+ * where they fall, and a chunk can be several sentences. A narration with no line break has a chunk for each sentence.
+ * [Audio tags] are stripped, as for the captions. Booth splits the same way, so keep the two in step (test/chunks.test.mjs
+ * and Booth's tests share their examples).
+ */
+export function chunks(narration = "") {
+  const lines = String(narration).split(/\r?\n/).map(cleanNarration).filter(Boolean);
+  return lines.length > 1 ? lines : sentences(lines[0] ?? "");
+}
+
 function probeSeconds(file) {
   const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8" });
   const seconds = parseFloat(r.stdout);
@@ -336,7 +363,7 @@ export function writeStoryboard(dir, cfg, outDir) {
   const rows = cfg.scenes.map((s) => ({
     id: s.id, file: `scenes/${s.id}.mp4`, start: round(s.start), duration: round(s.duration), type: s.type,
     onScreen: [s.kicker, s.title, ...(s.bullets ?? [])].filter(Boolean),
-    narration: s.narration ?? "", narrationClean: cleanNarration(s.narration), cues: cues(s),
+    narration: s.narration ?? "", narrationClean: cleanNarration(s.narration), chunks: chunks(s.narration), cues: cues(s),
     audioOffset: s.audioOffset ?? DEFAULT_AUDIO_OFFSET, captions: s.captions,
   }));
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify({ fps: cfg.fps, total: round(cfg.total), scenes: rows }, null, 2) + "\n");

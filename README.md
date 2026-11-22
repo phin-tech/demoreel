@@ -155,6 +155,11 @@ Put the words on each scene:
 Text in square brackets is for a voice engine that understands audio tags; the captions and the plain-text narration have
 them stripped. Not every engine reads them, so test one line first.
 
+**Chunks.** A narration is recorded, retaken and timed in chunks: a line break (`\n` in the JSON string) ends one, so you
+choose where they fall, and a chunk can be several sentences. A narration with no line break has a chunk for each
+sentence. The line breaks change nothing in the voice or the captions, which read the text as one run.
+`out/manifest.json` lists each scene's chunks.
+
 A scene now lasts as long as its narration takes to say, so the voice is never cut off. By default that is 150 words a
 minute plus a short pause, and `duration` is the minimum. Two ways to make it accurate:
 
@@ -259,11 +264,13 @@ digits, `<id>` the scene's `id` or else its `type`. `02-review` is the second sc
 ```json
 { "fps": 30, "total": 38.3, "scenes": [
   { "id": "01-queue", "start": 0, "duration": 11.2, "type": "bullets", "audioOffset": 0.3,
+    "chunks": ["Red Pen puts every pull request in one queue.", "What needs you is at the top."],
     "cues": [{ "t": 0.9, "label": "bullet: What needs you, first" }] } ] }
 ```
 
-`duration` is the scene's length; `cues` are what happens on screen, in seconds from the start of the scene (bullets, a
-screenshot landing, a click, a key); `audioOffset` is how far into the scene the voice starts.
+`duration` is the scene's length; `chunks` is the narration split as in [Chunks](#3-add-narration), without audio tags;
+`cues` are what happens on screen, in seconds from the start of the scene (bullets, a screenshot landing, a click, a
+key); `audioOffset` is how far into the scene the voice starts.
 
 **`audio/takes.json`** (Booth writes it; demoreel reads it): `{ "01-queue": "01-queue-take-2.wav" }`, the take each scene
 uses, a file in `audio/`. A scene's own `audio` in `demo.json` wins over it.
