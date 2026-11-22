@@ -11,6 +11,9 @@ const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_SCALE = 2;
 // The voice starts this many seconds into its scene, so the picture is there before the first word.
 const DEFAULT_AUDIO_OFFSET = 0.3;
+// Letters typed by a driver arrive as a key event each, a couple of frames apart; presses of a key are further apart.
+// Keys this close together, two or more of them, are shown as one piece of typing.
+const TYPING_GAP_FRAMES = 3;
 
 const THEME = {
   accent: "#e8a53a",
@@ -163,8 +166,36 @@ export function clipScene(dir, cfg, s, t0) {
   js.push(`tl.to("#${id}, #${id}v",{opacity:1,duration:.4},${round(t0)});`);
   js.push(`tl.to("#${id}, #${id}v",{opacity:0,duration:.4},${round(t0 + s.duration - 0.4)});`);
   js.push(`gsap.set("#${id}cursor",{x:${start.x},y:${start.y}});`);
-  s.events.events.forEach((e, i) => {
+  const events = s.events.events;
+  const gap = s.typingGap ?? TYPING_GAP_FRAMES;
+  const isChar = (e) => e.kind === "key" && (e.key.length === 1 || e.key === "space");
+  const runs = new Map();
+  const inRun = new Set();
+  for (let a = 0; a < events.length; a++) {
+    if (inRun.has(a) || !isChar(events[a])) continue;
+    let b = a;
+    while (b + 1 < events.length && isChar(events[b + 1]) && events[b + 1].frame - events[b].frame <= gap) b++;
+    if (b > a) {
+      runs.set(a, events.slice(a, b + 1));
+      for (let k = a; k <= b; k++) inRun.add(k);
+    }
+  }
+  events.forEach((e, i) => {
     const t = t0 + e.frame / fps;
+    if (inRun.has(i) && !runs.has(i)) return;
+    // A run of typing is one cap whose letters appear as they are typed.
+    if (runs.has(i)) {
+      const run = runs.get(i);
+      const spans = run.map((c, n) => `<span id="${id}k${i}c${n}">${c.key === "space" ? "&nbsp;" : esc(c.key)}</span>`).join("");
+      keys += `<div class="keyset" id="${id}k${i}"><div class="cap">${spans}</div></div>`;
+      js.push(`gsap.set("#${id}k${i}",{opacity:0,y:14});`);
+      run.forEach((c, n) => {
+        js.push(`gsap.set("#${id}k${i}c${n}",{opacity:0});`);
+        js.push(`tl.to("#${id}k${i}c${n}",{opacity:1,duration:.01},${round(t0 + c.frame / fps)});`);
+      });
+      js.push(`tl.to("#${id}k${i}",{opacity:1,y:0,duration:.2,ease:"power2.out"},${round(t)});tl.to("#${id}k${i}",{opacity:0,duration:.27},${round(t0 + run.at(-1).frame / fps + 0.93)});`);
+      return;
+    }
     if (e.x !== undefined) {
       const to = at(e);
       js.push(`tl.to("#${id}cursor",{x:${to.x},y:${to.y},duration:${round(GLIDE)},ease:"power2.inOut"},${round(Math.max(t0, t - GLIDE))});`);

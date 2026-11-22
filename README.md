@@ -106,7 +106,8 @@ You need two files:
 
 `frames` is the number of frames in the clip. `x` and `y` are in the recorded window's own units (points), measured
 from its top-left; if the window is not 1280×801, say so on the scene with `"window": { "w": 1440, "h": 900 }`. Kinds are
-`key` (`cmd-k`, `shift-enter`, `escape`), `click`, `hover`, `scroll` and `drag`. Keys show as key caps, clicks as an amber
+`key` (`cmd-k`, `shift-enter`, `escape`), `click`, `hover`, `scroll` and `drag`. Two or more single-character keys
+within 3 frames of each other are shown as one piece of typing (`"typingGap"` on the scene changes the 3). Keys show as key caps, clicks as an amber
 ring, and the pointer glides to each position just before it happens.
 
 Add it as a second scene:
