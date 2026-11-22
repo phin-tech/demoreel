@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildDeck } from "../src/deck.mjs";
+import { transcribe, align, cues as captionCues } from "../src/captions.mjs";
 import { build, removeScenePages, writeStoryboard, writeVids } from "../src/build.mjs";
 
 const tool = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -62,6 +63,15 @@ if (command === "export") {
     for (const s of cfg.scenes) hf(["render", "-c", `./scene-${s.n}.html`, "-o", `out/scenes/${s.id}.mp4`]);
   } finally {
     removeScenePages(dir, cfg);
+  }
+  // Captions for each scene that has recorded audio, timed from what was said.
+  for (const s of cfg.scenes) {
+    if (!s.audio || !s.narration) continue;
+    try {
+      s.captions = captionCues(align(s.narration, transcribe(dir, hyperframes, s)));
+    } catch (e) {
+      console.warn(`scene ${s.id}: no captions: ${e.message}`);
+    }
   }
   writeStoryboard(dir, cfg, join(dir, "out"));
   writeVids(cfg, join(dir, "out"));

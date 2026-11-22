@@ -26,8 +26,8 @@ installing this skill does not install the tool.
    with `ffmpeg -ss <t> -i out/x.mp4 -frames:v 1 f.png` and read them. A passing lint does not show how it looks.
 5. **Hand off.** `demoreel export <folder>` writes `out/scenes/*.mp4`, `storyboard.md`, `manifest.json` (with each scene's
    length and on-screen cues) and `captions.srt`. In Google Vids: new video, import the scene mp4s in order, paste each
-   scene's narration into its voice-over, add music, export. The captions are an even split of each scene, so re-time
-   them against real audio.
+   scene's narration into its voice-over, add music, export. Captions come only from real audio (Parakeet, installed with
+   `npx hyperframes models install parakeet`).
 6. **Voice, if the person will record it.** [Booth](https://github.com/phin-tech/booth) opens the folder, plays each
    exported scene beside its script and records takes to `audio/`; the take it marks is written to `audio/takes.json`
    and demoreel uses it as the scene's audio (a scene's own `audio` file wins). Rebuild to fit the scenes to the audio.

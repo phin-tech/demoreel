@@ -182,13 +182,16 @@ demoreel export my-demo --hd
 ```
 my-demo/out/vids/
   HOW-TO.txt
-  scene-01-intro/   01-intro.mp4 · narration.txt · narration-with-tags.txt · captions.srt
+  scene-01-intro/   01-intro.mp4 · narration.txt · narration-with-tags.txt · voice.wav and captions.srt (with recorded audio)
   scene-02-walk/    …
 ```
 
 Drag a scene's mp4 into Google Vids (or any editor), paste its `narration.txt` into the voice-over, and add music. The
-captions are an even split of each scene, so retime them once you have real audio. `out/storyboard.md` and
-`out/manifest.json` hold the whole plan, if you want it in one place.
+scene's `voice.wav` and, if it has recorded audio (step 3), `captions.srt` with real timing: Parakeet transcribes the
+audio on this machine and the times are laid onto the words of your narration, so the text is what you meant and the
+timing is what was said. Install it once with `npx hyperframes models install parakeet`. Results are cached in `build/`,
+and a scene without audio gets no captions. `out/storyboard.md` and `out/manifest.json` (with each scene's length and
+on-screen cues) hold the whole plan, if you want it in one place.
 
 ## 6. Make a deck to click through
 

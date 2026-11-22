@@ -295,13 +295,14 @@ export function cues(s) {
   return out.sort((a, b) => a.t - b.t);
 }
 
-/** The storyboard, the manifest and approximate captions: what an editor needs besides the scene files. */
+/** The storyboard, the manifest and captions: what an editor needs besides the scene files. */
 export function writeStoryboard(dir, cfg, outDir) {
   mkdirSync(outDir, { recursive: true });
   const rows = cfg.scenes.map((s) => ({
     id: s.id, file: `scenes/${s.id}.mp4`, start: round(s.start), duration: round(s.duration), type: s.type,
     onScreen: [s.kicker, s.title, ...(s.bullets ?? [])].filter(Boolean),
     narration: s.narration ?? "", narrationClean: cleanNarration(s.narration), cues: cues(s),
+    audioOffset: s.audioOffset, captions: s.captions,
   }));
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify({ fps: cfg.fps, total: round(cfg.total), scenes: rows }, null, 2) + "\n");
   const md = [`# ${cfg.title ?? "Demo"}: storyboard`, "", `Total ${round(cfg.total)}s. One mp4 per scene in \`scenes/\`; narration below is the text to voice (tags are for the voice engine; captions have them stripped).`, ""];
@@ -311,25 +312,23 @@ export function writeStoryboard(dir, cfg, outDir) {
     md.push("", r.narration ? `Narration: ${r.narration}` : "Narration: (none yet)", "");
   }
   writeFileSync(join(outDir, "storyboard.md"), md.join("\n"));
-  writeFileSync(join(outDir, "captions.srt"), captions(rows, true));
+  const whole = srt(rows, true);
+  // Nothing to write, and nothing stale left from an earlier export.
+  rmSync(join(outDir, "captions.srt"), { force: true });
+  // Nothing to write, and nothing stale left from an earlier export.
+  rmSync(join(outDir, "captions.srt"), { force: true });
+  if (whole) writeFileSync(join(outDir, "captions.srt"), whole);
 }
 
-// Without audio the sentence timing is only an even split of each scene, so captions are a starting point. With
-// `whole` the times run across the film; without, from the start of the one scene.
-function captions(rows, whole) {
+// Captions come only from real audio (see captions.mjs). `whole` runs the times across the film, else from the scene's start.
+function srt(rows, whole) {
   let n = 1;
-  const srt = [];
+  const out = [];
   for (const r of rows) {
-    const base = whole ? r.start : 0;
-    const sentences = r.narrationClean.split(/(?<=[.!?])\s+/).filter(Boolean);
-    const span = Math.max(0.5, r.duration - 0.6);
-    sentences.forEach((text, i) => {
-      const a = base + 0.3 + (span * i) / sentences.length;
-      const b = base + 0.3 + (span * (i + 1)) / sentences.length;
-      srt.push(`${n++}\n${timecode(a)} --> ${timecode(b)}\n${text}\n`);
-    });
+    const base = (whole ? r.start : 0) + (r.audioOffset ?? 0.3);
+    for (const c of r.captions ?? []) out.push(`${n++}\n${timecode(base + c.start)} --> ${timecode(base + c.end)}\n${c.text}\n`);
   }
-  return srt.join("\n");
+  return out.join("\n");
 }
 
 /** out/vids/scene-NN-id/: each scene's video, narration and captions together, to drag into an editor. */
@@ -342,10 +341,10 @@ export function writeVids(cfg, outDir) {
     mkdirSync(folder, { recursive: true });
     copyFileSync(join(outDir, "scenes", `${s.id}.mp4`), join(folder, `${s.id}.mp4`));
     if (s.audio) copyFileSync(join(dirname(outDir), s.audio), join(folder, `voice${extname(s.audio)}`));
-    const row = { narrationClean: cleanNarration(s.narration), duration: s.duration };
+    const row = { narrationClean: cleanNarration(s.narration), duration: s.duration, audioOffset: s.audioOffset, captions: s.captions };
     writeFileSync(join(folder, "narration.txt"), (row.narrationClean || "(no narration yet)") + "\n");
     if (s.narration) writeFileSync(join(folder, "narration-with-tags.txt"), s.narration + "\n");
-    if (row.narrationClean) writeFileSync(join(folder, "captions.srt"), captions([row], false));
+    if (s.captions?.length) writeFileSync(join(folder, "captions.srt"), srt([row], false));
     index.push(`scene-${s.id}/  ${round(s.duration)}s`);
   }
   writeFileSync(join(vids, "HOW-TO.txt"), [
@@ -356,7 +355,7 @@ export function writeVids(cfg, outDir) {
     "",
     "In Google Vids: make a new video, upload or drag in each scene's .mp4 in order, and paste that scene's",
     "narration.txt into its voice-over. narration-with-tags.txt keeps the audio tags for a voice engine that reads them.",
-    "captions.srt times are an even split of the scene, so retime them against real audio.",
+    "captions.srt is there for a scene with recorded audio: its words, timed from what was said.",
     "",
   ].join("\n"));
 }
