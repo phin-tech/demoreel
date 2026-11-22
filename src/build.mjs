@@ -68,7 +68,9 @@ export function load(dir) {
       ? Math.ceil((s.audioSeconds + 0.6) * 10) / 10
       : words ? Math.ceil(((words * 60) / (cfg.wordsPerMinute ?? 150) + 0.8) * 10) / 10 : 0;
     if (s.type === "clip") {
-      s.events = JSON.parse(readFileSync(join(dir, s.events), "utf8"));
+      // A scene that `demoreel record` makes needs to name no files: they are <id>.mp4 and <id>.events.json.
+      s.video ??= `${scene.id ?? "clip"}.mp4`;
+      s.events = JSON.parse(readFileSync(join(dir, s.events ?? `${scene.id ?? "clip"}.events.json`), "utf8"));
       s.clipSeconds = s.events.frames / (s.events.fps ?? cfg.fps);
       s.duration = Math.max(s.clipSeconds, s.spoken);
     } else {
@@ -150,7 +152,7 @@ function heldClip(dir, s) {
 
 export function clipScene(dir, cfg, s, t0) {
   const id = `s${s.n}`;
-  const win = s.window ?? { w: 1280, h: 801 };
+  const win = s.window ?? s.events.window ?? { w: 1280, h: 801 };
   const card = { x: 180, y: 70, width: 1560, ...s.card };
   const k = card.width / win.w;
   const height = round(win.h * k);

@@ -116,6 +116,21 @@ Add it as a second scene:
 { "type": "clip", "id": "walk", "video": "walk.mp4", "events": "walk.events.json" }
 ```
 
+**Let demoreel record it.** If the app can be driven by [Typecase](https://git.phin.tech/sam/typecase)'s driver (a GPUI app
+built with its `driver` feature), give the scene a `record` block and no files:
+
+```json
+{ "type": "clip", "id": "demo",
+  "record": { "command": ["./target/debug/examples/driven"], "cwd": "../typecase",
+              "drive": "../typecase/target/debug/typecase-drive", "script": "demo.script" } }
+```
+
+`demoreel record my-demo` starts the app hidden, runs `demo.script` (the lines `typecase-drive` reads: `click #add`,
+`type Sam`, `wait:600`), writes `demo.mp4` and `demo.events.json` (with the window's size in it, so the scene needn't
+say it), and quits the app. `--scene <id>` records one scene. Options: `socketEnv` (the variable that tells the app where
+to listen, default `TYPECASE_DRIVER_SOCKET`), `env`, `fps` (30). Nothing takes focus and no screen recording
+permission is needed. The design is in `docs/adr/0001-drivers-share-one-recording-contract.md`.
+
 **No way to record your app?** Any screen recording works. Record it with QuickTime, with the cursor hidden if you can, and
 write the events by hand: watch the video, note the frame of each click or key (frames = seconds × 30), and read the
 coordinates off a screenshot of the same window. It is fiddly the first time and quick after that.
@@ -282,7 +297,7 @@ Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `link`, `linkLabel`, `zoom` (
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
 fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
 
-Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `timeline`; `deck`; `present`.
+Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `timeline`; `record`; `deck`; `present`.
 
 ## Troubleshooting
 

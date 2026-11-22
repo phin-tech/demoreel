@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// demoreel build|lint|render|export|timeline|deck|present [project]
+// demoreel build|lint|render|export|timeline|deck|present|record [project]
 import { join, resolve, dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildDeck } from "../src/deck.mjs";
 import { writeTimeline } from "../src/timeline.mjs";
+import { record } from "../src/record.mjs";
 import { transcribe, align, cues as captionCues } from "../src/captions.mjs";
 import { build, removeScenePages, writeStoryboard, writeVids } from "../src/build.mjs";
 
@@ -20,6 +21,8 @@ const usage = `demoreel <command> [project-folder]
   build    write index.html and scene-NN.html from demo.json (and resized images in build/)
   lint     build, then HyperFrames' own checks
   render   build, then render the whole film to out/<name>.mp4
+  record   run each clip scene's \`record\` block: launch the app hidden, run its script through the driver, and write
+           the scene's video and events (needs the app and typecase-drive; see docs/adr/0001-*.md)
   timeline write out/timeline/: an FCPXML for DaVinci Resolve or Final Cut (scenes silent on one track, each voice on
            an audio track under it), after \`export\`
   deck     write deck/ from demo.json: a slideshow of the same scenes (bullets come in one per press, a card's \`link\`
@@ -37,7 +40,7 @@ function hf(args) {
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
-if (!["build", "lint", "render", "export", "timeline", "deck", "present"].includes(command)) {
+if (!["build", "lint", "render", "export", "timeline", "record", "deck", "present"].includes(command)) {
   console.log(usage);
   process.exit(command ? 1 : 0);
 }
@@ -48,6 +51,24 @@ if (command === "deck" || command === "present") {
   if (command === "present") {
     const p = spawnSync(hyperframes, ["present", "deck", "--no-open"], { cwd: dir, stdio: "inherit" });
     process.exit(p.status ?? 0);
+  }
+  process.exit(0);
+}
+
+if (command === "record") {
+  // Reads demo.json directly: the clip files this makes may not exist yet, which `build` would refuse.
+  const raw = JSON.parse((await import("node:fs")).readFileSync(join(dir, "demo.json"), "utf8"));
+  const only = rest.find((a, i) => rest[i - 1] === "--scene");
+  const todo = raw.scenes.map((s, i) => ({ ...s, id: s.id ?? s.type, n: i })).filter((s) => s.record && (!only || s.id === only));
+  if (!todo.length) { console.error("no scene has a `record` block" + (only ? ` named ${only}` : "")); process.exit(1); }
+  for (const s of todo) {
+    try {
+      const r = await record(dir, s);
+      console.log(`wrote ${r.video} and ${r.events} (${r.frames} frames)`);
+    } catch (e) {
+      console.error(`record failed: ${e.message}`);
+      process.exit(1);
+    }
   }
   process.exit(0);
 }

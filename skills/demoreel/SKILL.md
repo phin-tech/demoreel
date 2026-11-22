@@ -19,7 +19,8 @@ installing this skill does not install the tool.
      frame (`{"fps":30,"frames":N,"events":[{"frame":15,"kind":"key","key":"j"}, …]}`; kinds `key`, `click`, `hover`,
      `scroll`, `drag`, with `x`/`y` in window points). Encode the frames with ffmpeg
      (`ffmpeg -framerate 30 -i %05d.png -c:v libx264 -crf 14 -pix_fmt yuv420p clip.mp4`). The pointer, click rings and key
-     caps are drawn later from `events.json`, because a hidden window has no real pointer.
+     caps are drawn later from `events.json`, because a hidden window has no real pointer. For a GPUI app with Typecase's
+   driver, put a `record` block on the clip scene and run `demoreel record <folder>`, which does all of this.
 3. **Write `demo.json`.** `bullets` scenes (title, bullets, floating `cards`, optional `zoom`) and `clip` scenes (a video and
    its events). Put the narration in each scene.
 4. **Check, then render.** `demoreel lint <folder>`, then look at frames before calling it done: render, then pull stills
