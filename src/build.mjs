@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, copyFileSync, rmSync } from "node:fs";
 import { join, basename, extname, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
+import { esc, round } from "./util.mjs";
 import { fileURLToPath } from "node:url";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,8 +25,6 @@ const THEME = {
 };
 const GLYPHS = { cmd: "⌘", shift: "⇧", alt: "⌥", ctrl: "⌃", enter: "↵", escape: "esc", space: "space", tab: "⇥", backspace: "⌫" };
 
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const round = (n) => Math.round(n * 1000) / 1000;
 export const cleanNarration = (s = "") => s.replace(/\[[^\]]*\]\s*/g, "").replace(/\s+/g, " ").trim();
 
 /** Text split after each full stop, question mark or exclamation mark that ends a word (not the dot in "v1.2"). */

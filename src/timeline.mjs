@@ -5,8 +5,8 @@ import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node
 import { extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
+import { esc } from "./util.mjs";
 
-const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 function probe(file, entries, stream) {
   const args = ["-v", "error", ...(stream ? ["-select_streams", stream] : []), "-show_entries", entries, "-of", "json", file];

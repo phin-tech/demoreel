@@ -5,8 +5,8 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { cleanNarration } from "./build.mjs";
+import { round } from "./util.mjs";
 
-const round = (n) => Math.round(n * 1000) / 1000;
 const norm = (w) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 /** The spoken words of a scene's audio with their times, from a cache in build/ unless the audio has changed. */

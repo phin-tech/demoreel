@@ -11,8 +11,23 @@
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { sleep } from "./util.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Runs the `record` block of each scene of a project that has one (just `only`, by its id, if given). */
+export async function recordScenes(dir, only, { log = console.log } = {}) {
+  // demo.json is read as it is: the clip files this makes may not exist yet, which loading the project would refuse.
+  const raw = JSON.parse(readFileSync(join(dir, "demo.json"), "utf8"));
+  const todo = raw.scenes.map((s) => ({ ...s, id: s.id ?? s.type })).filter((s) => s.record && (!only || s.id === only));
+  if (!todo.length) throw new Error("no scene has a `record` block" + (only ? ` named ${only}` : ""));
+  const done = [];
+  for (const scene of todo) {
+    const r = await record(dir, scene, { log });
+    log(`wrote ${r.video} and ${r.events} (${r.frames} frames)`);
+    done.push(r);
+  }
+  return done;
+}
 
 /** Runs one scene's `record` block and returns the files it wrote. */
 export async function record(dir, scene, { log = console.log } = {}) {

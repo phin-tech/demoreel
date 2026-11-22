@@ -5,10 +5,10 @@ import { writeFileSync, mkdirSync, rmSync, cpSync, copyFileSync } from "node:fs"
 import { join, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { round } from "./util.mjs";
 import { build, textScene, clipScene, rules, cleanNarration } from "./build.mjs";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
-const round = (n) => Math.round(n * 1000) / 1000;
 
 function imageSize(file) {
   const r = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { encoding: "utf8" });

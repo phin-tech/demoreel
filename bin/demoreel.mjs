@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildDeck } from "../src/deck.mjs";
 import { writeTimeline } from "../src/timeline.mjs";
-import { record } from "../src/record.mjs";
+import { recordScenes } from "../src/record.mjs";
 import { transcribe, align, cues as captionCues } from "../src/captions.mjs";
 import { build, removeScenePages, writeStoryboard, writeVids } from "../src/build.mjs";
 
@@ -56,19 +56,11 @@ if (command === "deck" || command === "present") {
 }
 
 if (command === "record") {
-  // Reads demo.json directly: the clip files this makes may not exist yet, which `build` would refuse.
-  const raw = JSON.parse((await import("node:fs")).readFileSync(join(dir, "demo.json"), "utf8"));
-  const only = rest.find((a, i) => rest[i - 1] === "--scene");
-  const todo = raw.scenes.map((s, i) => ({ ...s, id: s.id ?? s.type, n: i })).filter((s) => s.record && (!only || s.id === only));
-  if (!todo.length) { console.error("no scene has a `record` block" + (only ? ` named ${only}` : "")); process.exit(1); }
-  for (const s of todo) {
-    try {
-      const r = await record(dir, s);
-      console.log(`wrote ${r.video} and ${r.events} (${r.frames} frames)`);
-    } catch (e) {
-      console.error(`record failed: ${e.message}`);
-      process.exit(1);
-    }
+  try {
+    await recordScenes(dir, rest.find((a, i) => rest[i - 1] === "--scene"));
+  } catch (e) {
+    console.error(`record failed: ${e.message}`);
+    process.exit(1);
   }
   process.exit(0);
 }

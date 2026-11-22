@@ -13,9 +13,9 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
+import { sleep } from "./util.mjs";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const STEP_PAUSE = 120;
 const TYPE_PAUSE = 60;
 const KEYS = { enter: "Enter", escape: "Escape", esc: "Escape", tab: "Tab", backspace: "Backspace", space: " ", up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
