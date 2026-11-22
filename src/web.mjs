@@ -3,7 +3,8 @@
 // pointer, so the frames come out clean, which is what the clip scene wants.
 //
 //   "record": { "driver": "web", "url": "http://localhost:3000" | "page.html",
-//               "script": "web.script", "viewport": { "width": 1280, "height": 800 }, "scale": 2, "fps": 30 }
+//               "script": "web.script", "viewport": { "width": 1280, "height": 800 }, "scale": 2, "fps": 30,
+//               "session": "app.session.json" }      // signed-in cookies and storage, saved by `demoreel login`
 //
 // The script has the lines typecase-drive reads, for a page: `click #id`, `click Some label`, `click:X,Y`, `move:X,Y`,
 // `type some words`, `enter` / `cmd-k` / `shift-tab` (a key), `scroll:X,Y,DY`, `goto:URL`, `wait:600`; several steps may share
@@ -14,6 +15,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
 import { sleep } from "./util.mjs";
+import { applySession, bounced, captureSession, readSession, writeSession } from "./session.mjs";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 const STEP_PAUSE = 120;
@@ -21,7 +23,7 @@ const TYPE_PAUSE = 60;
 const KEYS = { enter: "Enter", escape: "Escape", esc: "Escape", tab: "Tab", backspace: "Backspace", space: " ", up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
 const MODS = { cmd: "Meta", ctrl: "Control", alt: "Alt", shift: "Shift" };
 
-function findChrome() {
+export function findChrome() {
   if (process.env.DEMOREEL_CHROME) return process.env.DEMOREEL_CHROME;
   const r = spawnSync(join(TOOL, "node_modules/.bin/hyperframes"), ["browser", "path"], { encoding: "utf8" });
   const path = (r.stdout ?? "").trim().split("\n").pop();
@@ -66,7 +68,11 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
   try {
     const page = await browser.newPage();
     await page.setViewport({ ...viewport, deviceScaleFactor: scale });
+    if (r.session) await applySession(page, readSession(resolve(dir, r.session)));
     await page.goto(url, { waitUntil: "networkidle0" });
+    if (r.session && bounced(url, page.url())) {
+      throw new Error(`scene ${scene.id}: asked for ${url} but landed on ${page.url()}: the session has probably expired, so run \`demoreel login\` again`);
+    }
 
     // Frames are real screenshots, at the page's device scale, taken back to back while the script runs; each is held until
     // the next, and later made into a steady rate. (Chrome's screencast ignores the device scale and comes out soft.)
@@ -165,6 +171,31 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     writeFileSync(eventsFile, JSON.stringify({ fps, frames: total, window: { w: viewport.width, h: viewport.height }, events }, null, 1) + "\n");
     log(`  ${scene.id}: ${shown.length} frames drawn, ${total} at ${fps}fps, ${events.length} events`);
     return { video, events: eventsFile, frames: total };
+  } finally {
+    await browser.close();
+  }
+}
+
+/** `demoreel login`: opens the scene's page in a visible Chrome, waits for you to sign in, and saves the session to
+ *  record.session. `done` resolves when you are signed in (the CLI waits for Enter). */
+export async function loginWeb(dir, scene, done, { log = console.log } = {}) {
+  const r = scene.record;
+  if (!r.url) throw new Error(`scene ${scene.id}: record.url is the page to open`);
+  if (!r.session) throw new Error(`scene ${scene.id}: record.session is the file to save the sign-in to, such as "app.session.json"`);
+  const url = /^[a-z]+:\/\//.test(r.url) ? r.url : pathToFileURL(resolve(dir, r.url)).href;
+  const file = resolve(dir, r.session);
+  const viewport = { width: 1280, height: 800, ...r.viewport };
+  const browser = await puppeteer.launch({ executablePath: findChrome(), headless: false, defaultViewport: null,
+    args: [`--window-size=${viewport.width},${viewport.height + 120}`] });
+  try {
+    const page = (await browser.pages())[0] ?? (await browser.newPage());
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await done();
+    // Sign-in often ends on another page than the one asked for; the storage that matters is the app's own.
+    const session = await captureSession(page);
+    writeSession(file, session);
+    log(`saved ${session.cookies.length} cookies from ${page.url()} to ${file}`);
+    return file;
   } finally {
     await browser.close();
   }

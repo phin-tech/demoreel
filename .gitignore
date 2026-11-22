@@ -5,3 +5,4 @@ scene-*.html
 index.html
 .hyperframes/
 deck/
+*.session.json

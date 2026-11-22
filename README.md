@@ -148,6 +148,25 @@ the Typecase driver, for a page: `click #note` (a selector) or `click Add note` 
 `DEMOREEL_CHROME` to a Chrome binary. `page.screenshot` takes focus from the page it films, so the driver captures with
 the DevTools protocol directly.
 
+**An app behind a login.** A fresh headless Chrome isn't signed in, so a page behind a login, OAuth or SSO would show the
+sign-in page. Give the `record` block a `session` file and sign in once by hand:
+
+```json
+"record": { "driver": "web", "url": "https://app.internal.example/", "script": "web.script", "session": "app.session.json" }
+```
+
+```bash
+demoreel login my-demo      # opens Chrome on the url; sign in (MFA, SSO, whatever it asks), then press Enter in the terminal
+demoreel record my-demo     # loads the cookies and local storage first, so the page opens signed in
+```
+
+`login` saves every cookie in that window and the page's local storage to `app.session.json`, readable only by you; `*.session.json`
+is gitignored. A VPN needs nothing from demoreel: Chrome runs on your Mac and uses its network, so connect before
+`login` and `record`. If `record` ends up on a different host than `url` (the sign-in page, usually), it stops and says the session
+has probably expired; run `login` again. The file is Playwright's storage-state shape, so one exported elsewhere works, and
+a bare list of cookies does too. Treat it like a password: it signs in as you, and the video shows whatever your account can see.
+`--scene <id>` limits `login` to one scene.
+
 **No way to record your app?** Any screen recording works. Record it with QuickTime, with the cursor hidden if you can, and
 write the events by hand: watch the video, note the frame of each click or key (frames = seconds × 30), and read the
 coordinates off a screenshot of the same window. It is fiddly the first time and quick after that.
@@ -321,7 +340,7 @@ Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `link`, `linkLabel`, `zoom` (
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
 fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
 
-Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `timeline`; `record`; `deck`; `present`.
+Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`.
 
 ## Troubleshooting
 

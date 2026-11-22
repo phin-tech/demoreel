@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// demoreel build|lint|render|export|timeline|deck|present|record [project]
+// demoreel build|lint|render|export|timeline|deck|present|record|login [project]
 import { join, resolve, dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { buildDeck } from "../src/deck.mjs";
 import { writeTimeline } from "../src/timeline.mjs";
-import { recordScenes } from "../src/record.mjs";
+import { loginScenes, recordScenes } from "../src/record.mjs";
 import { transcribe, align, cues as captionCues } from "../src/captions.mjs";
 import { build, removeScenePages, writeStoryboard, writeVids } from "../src/build.mjs";
 
@@ -23,6 +23,8 @@ const usage = `demoreel <command> [project-folder]
   render   build, then render the whole film to out/<name>.mp4
   record   run each clip scene's \`record\` block: launch the app hidden, run its script through the driver, and write
            the scene's video and events (needs the app and typecase-drive; see docs/adr/0001-*.md)
+  login    sign in once for a web scene whose \`record\` has a \`session\`: opens Chrome on the page, waits for you to sign
+           in and press Enter here, and saves the cookies for \`record\` to use (the file is private and gitignored)
   timeline write out/timeline/: an FCPXML for DaVinci Resolve or Final Cut (scenes silent on one track, each voice on
            an audio track under it), after \`export\`
   deck     write deck/ from demo.json: a slideshow of the same scenes (bullets come in one per press, a card's \`link\`
@@ -40,7 +42,7 @@ function hf(args) {
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
-if (!["build", "lint", "render", "export", "timeline", "record", "deck", "present"].includes(command)) {
+if (!["build", "lint", "render", "export", "timeline", "record", "login", "deck", "present"].includes(command)) {
   console.log(usage);
   process.exit(command ? 1 : 0);
 }
@@ -60,6 +62,21 @@ if (command === "record") {
     await recordScenes(dir, rest.find((a, i) => rest[i - 1] === "--scene"));
   } catch (e) {
     console.error(`record failed: ${e.message}`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+if (command === "login") {
+  try {
+    const { createInterface } = await import("node:readline/promises");
+    await loginScenes(dir, rest.find((a, i) => rest[i - 1] === "--scene"), async (scene) => {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      await rl.question(`Sign in to ${scene.record.url} in the Chrome window, then press Enter here to save the session. `);
+      rl.close();
+    });
+  } catch (e) {
+    console.error(`login failed: ${e.message}`);
     process.exit(1);
   }
   process.exit(0);

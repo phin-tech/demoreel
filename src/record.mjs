@@ -87,3 +87,21 @@ export async function record(dir, scene, { log = console.log } = {}) {
     rmSync(work, { recursive: true, force: true });
   }
 }
+
+/** `demoreel login`: for each web clip scene with a `record.session` (just `only`, by its id, if given), sign in by hand in
+ *  a visible Chrome and save the session. `wait` is awaited once the page is open and you have signed in. */
+export async function loginScenes(dir, only, wait, { log = console.log } = {}) {
+  const raw = JSON.parse(readFileSync(join(dir, "demo.json"), "utf8"));
+  const todo = raw.scenes.map((s) => ({ ...s, id: s.id ?? s.type }))
+    .filter((s) => s.record?.driver === "web" && s.record.session && (!only || s.id === only));
+  if (!todo.length) throw new Error("no web scene has a `record.session`" + (only ? ` named ${only}` : ""));
+  // Scenes that share a session file are signed in once.
+  const seen = new Set();
+  for (const scene of todo) {
+    const file = resolve(dir, scene.record.session);
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const { loginWeb } = await import("./web.mjs");
+    await loginWeb(dir, scene, () => wait(scene), { log });
+  }
+}
