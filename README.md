@@ -116,8 +116,8 @@ Add it as a second scene:
 { "type": "clip", "id": "walk", "video": "walk.mp4", "events": "walk.events.json" }
 ```
 
-**Let demoreel record it.** If the app can be driven by [Typecase](https://git.phin.tech/sam/typecase)'s driver (a GPUI app
-built with its `driver` feature), give the scene a `record` block and no files:
+**Let demoreel record it.** If the app can be driven by Typecase's driver (a GPUI app
+built with its `driver` feature, run with `typecase-drive`), give the scene a `record` block and no files:
 
 ```json
 { "type": "clip", "id": "demo",

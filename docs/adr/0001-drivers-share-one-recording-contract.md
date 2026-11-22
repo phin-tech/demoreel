@@ -36,13 +36,12 @@ name, `wait:600`, `move:X,Y`), so one script can run against whichever driver fi
 
 ## Order
 
-1. Typecase's `--events` recording, which writes exactly this and is built (`feat/driver-events`, not yet released),
-   and moving Red Pen onto it in place of `REDPEN_RECORD`.
+1. Typecase's `--events` recording, which writes exactly this, and Red Pen's recorder moving onto it in place of its own.
 2. `demoreel record`, the single entrance, with an adapter for Typecase's driver first since it works today. It owns the
    process it launches (a driver that does not quit when asked is killed), keeps the driver's socket path short in a
    temporary folder, and takes the window size from the driver when the scene does not give one.
 3. The web driver, inside demoreel and behind the same `record` block.
-4. A Swift driver in `apple-template`, after a test of how well a window can be captured, since that is the unknown.
+4. A Swift driver, built into each Swift app from the debug socket the apps already have, after a test of how well a window can be captured, since that is the unknown.
 5. Pacing a script from the words of recorded narration, which sits on top of any driver.
 
 iOS and other Mac apps wait until something needs them. The Accessibility route needs Accessibility and Screen
