@@ -148,6 +148,10 @@ minute plus a short pause, and `duration` is the minimum. Two ways to make it ac
 
 A clip shorter than its narration holds its last frame.
 
+**Record it with Booth.** [Booth](https://github.com/phin-tech/booth) is a Mac app that opens a project, plays each scene's
+video (from `demoreel export`) beside its narration as a teleprompter, and records takes to `audio/`. The take you pick
+is written to `audio/takes.json`, and demoreel uses it as that scene's `audio` unless the scene names a file itself.
+
 **Recorded or generated audio.** Put the file on the scene, `"audio": "intro.wav"` (anything ffmpeg reads), and demoreel
 measures it, sets the scene's length to fit with a short pause after, and mixes it into the video starting 0.3 seconds in
 (`"audioOffset"` changes that). No need to type `audioSeconds`. Exports also copy it into the scene's folder as `voice.*`.

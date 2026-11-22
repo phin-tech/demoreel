@@ -42,12 +42,16 @@ export function load(dir) {
   cfg.fps ??= 30;
   cfg.scale = Number(process.env.DEMOREEL_SCALE) || cfg.scale || DEFAULT_SCALE;
   cfg.theme = { ...THEME, ...cfg.theme };
+  const takesFile = join(dir, "audio/takes.json");
+  const takes = existsSync(takesFile) ? JSON.parse(readFileSync(takesFile, "utf8")) : {};
   let start = 0;
   cfg.scenes = cfg.scenes.map((scene, i) => {
     const n = String(i + 1).padStart(2, "0");
     const s = { ...scene, n, id: `${n}-${scene.id ?? scene.type}` };
     // A scene lasts as long as its narration takes to say (its `audioSeconds` if measured, else `wordsPerMinute`) and a short pause, if that is longer
     // than the scene's own `duration` (a clip's is the clip's length), so the voice is never cut off.
+    // A take chosen in Booth (audio/takes.json) is the scene's audio unless the scene names one itself.
+    if (!s.audio && takes[s.id] && existsSync(join(dir, "audio", takes[s.id]))) s.audio = `audio/${takes[s.id]}`;
     // A recorded `audio` file is measured, and that is its `audioSeconds`.
     if (s.audio) {
       if (!existsSync(join(dir, s.audio))) throw new Error(`scene ${s.id}: audio file ${s.audio} not found`);
