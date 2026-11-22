@@ -6,6 +6,8 @@ description: Make a product demo video from scripted app recordings, floating sc
 # demoreel
 
 Demos are built from a `demo.json` (scenes) and rendered with HyperFrames. Read `README.md` for the file format.
+Run the CLI from a clone of https://github.com/phin-tech/demoreel (`npm install`, then `node bin/demoreel.mjs <command> <project>`);
+installing this skill does not install the tool.
 
 ## Workflow
 

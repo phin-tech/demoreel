@@ -203,8 +203,26 @@ Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole fil
 
 ## Using it with an agent
 
-`skills/demoreel/SKILL.md` is this workflow written for a coding agent. Copy it to `~/.claude/skills/demoreel/` to use it
-with Claude Code.
+`skills/demoreel/SKILL.md` is this workflow written for a coding agent: storyboard, record, write `demo.json`, check frames,
+export for an editor. Install it with the [`skills`](https://github.com/vercel-labs/skills) CLI (needs Node 22.20 or newer):
+
+```bash
+# into the current project
+npx skills add phin-tech/demoreel
+
+# or for every project on this machine
+npx skills add phin-tech/demoreel -g
+
+# or choose the skill and the agent without being asked
+npx skills add phin-tech/demoreel --skill demoreel -a claude-code
+```
+
+The CLI works with Claude Code, Codex, Cursor and many other agents, and asks which to install to. Afterwards
+`npx skills list` shows what is installed, `npx skills update` brings it up to date and `npx skills remove demoreel`
+takes it out. The skill tells the agent to run demoreel from a clone of this repo, so clone it too (see step 1).
+
+No `skills` CLI? Copy `skills/demoreel/` into your agent's skills folder by hand; for Claude Code that is
+`~/.claude/skills/demoreel/`.
 
 ## Licence
 
