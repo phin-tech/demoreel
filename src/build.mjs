@@ -276,13 +276,35 @@ const timecode = (t) => {
   return `${p(Math.floor(ms / 3600000), 2)}:${p(Math.floor(ms / 60000) % 60, 2)}:${p(Math.floor(ms / 1000) % 60, 2)},${p(ms % 1000, 3)}`;
 };
 
+// What happens on screen and when, in seconds from the start of the scene, for a narrator to talk to (Booth shows them).
+// The bullet and card times are the ones textScene animates with.
+export function cues(s) {
+  const out = [];
+  if (s.type === "clip") {
+    const fps = s.events.fps ?? 30;
+    for (const e of s.events.events) {
+      const label = e.kind === "key" ? `key ${e.key}` : e.kind;
+      out.push({ t: round(e.frame / fps), label });
+    }
+  } else {
+    if (s.title) out.push({ t: 0.15, label: "title" });
+    (s.bullets ?? []).forEach((b, k) => out.push({ t: round(0.9 + k * 0.35), label: `bullet: ${b}` }));
+    (s.cards ?? []).forEach((c, k) => {
+      const at = 0.3 + (c.delay ?? 0);
+      out.push({ t: round(at), label: `screenshot ${k + 1} lands` });
+      if (c.zoom) out.push({ t: round(c.zoom.at ?? 1.8), label: `zoom in on screenshot ${k + 1}` });
+    });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+
 /** The storyboard, the manifest and approximate captions: what an editor needs besides the scene files. */
 export function writeStoryboard(dir, cfg, outDir) {
   mkdirSync(outDir, { recursive: true });
   const rows = cfg.scenes.map((s) => ({
     id: s.id, file: `scenes/${s.id}.mp4`, start: round(s.start), duration: round(s.duration), type: s.type,
     onScreen: [s.kicker, s.title, ...(s.bullets ?? [])].filter(Boolean),
-    narration: s.narration ?? "", narrationClean: cleanNarration(s.narration),
+    narration: s.narration ?? "", narrationClean: cleanNarration(s.narration), cues: cues(s),
   }));
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify({ fps: cfg.fps, total: round(cfg.total), scenes: rows }, null, 2) + "\n");
   const md = [`# ${cfg.title ?? "Demo"}: storyboard`, "", `Total ${round(cfg.total)}s. One mp4 per scene in \`scenes/\`; narration below is the text to voice (tags are for the voice engine; captions have them stripped).`, ""];
