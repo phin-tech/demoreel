@@ -4,8 +4,12 @@ demoreel's clip scenes show an app being used: a recording with no pointer in it
 done on which frame. The pointer, click rings and key caps are drawn over it afterwards, so they can be restyled without
 recording again. Anything that can drive an app and produce those two files can feed a clip scene.
 
-So demoreel does not drive apps itself, and it does not pick one way of driving. There are several kinds of target, each
-driven by the tool that suits it, and they agree on what comes out.
+So demoreel is the one entrance, and not the one place the driving code lives. `demoreel record` takes a scene's `record`
+block (which driver, what to launch, the script, the window size), runs the matching driver and encodes the result into a
+clip scene. A driver is an adapter: demoreel starts it, hands it the script and collects frames and `events.json`.
+The web driver lives in demoreel, since it is Node and `puppeteer-core` is already installed beside HyperFrames. The
+others stay in the code that knows the target (Typecase's driver for GPUI apps, a debug socket inside a Swift app),
+and demoreel runs their commands.
 
 | Target | Driven by | Frames come from | Runs hidden |
 |---|---|---|---|
@@ -33,10 +37,10 @@ name, `wait:600`, `move:X,Y`), so one script can run against whichever driver fi
 
 1. Typecase's `--events` recording, which writes exactly this and is built (`feat/driver-events`, not yet released),
    and moving Red Pen onto it in place of `REDPEN_RECORD`.
-2. A web driver, the cheapest and the most useful away from our own apps.
+2. A web driver inside demoreel, the cheapest and the most useful away from our own apps.
 3. A Swift driver in `apple-template`, after a test of how well a window can be captured, since that is the unknown.
-4. `demoreel record`, which launches a target, runs its script and fills in a clip scene, and pacing a script from the
-   words of recorded narration, which sit on top of any driver.
+4. `demoreel record`, the single entrance: one adapter for Typecase's driver first, then the web driver, each filling in
+   a clip scene. After that, pacing a script from the words of recorded narration, which sits on top of any driver.
 
 iOS and other Mac apps wait until something needs them. The Accessibility route needs Accessibility and Screen
 Recording permission and a visible window, and iOS needs a simulator set up first.
@@ -54,8 +58,10 @@ Recording permission and a visible window, and iOS needs a simulator set up firs
 
 ## Consequences
 
-- Each driver is its own code, in its own place. demoreel only reads the result, so a new kind of target is a new driver
-  and no change here.
+- A new kind of target is a new driver in its own place, plus a small adapter in demoreel so `demoreel record` can run
+  it. demoreel does not need to know how a target is driven, only how to start the driver and where its output lands.
+- demoreel grows a runtime dependency on `puppeteer-core` for the web driver, which today comes only through HyperFrames
+  and is not declared by demoreel itself.
 - The contract is shared by repositories: demoreel, Typecase and any app with a driver. Changing the shape of
   `events.json` means changing all of them together, and the README section is where it is written down.
 - A website cannot be captured at an exact rate in real time, so a web driver timestamps its frames and resamples them.
