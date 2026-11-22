@@ -5,7 +5,14 @@
   "type": "module",
   "private": true,
   "license": "Apache-2.0",
-  "bin": { "demoreel": "bin/demoreel.mjs" },
-  "engines": { "node": ">=22" },
-  "dependencies": { "hyperframes": "0.9.80" }
+  "author": "Sam Phinizy",
+  "bin": {
+    "demoreel": "bin/demoreel.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "hyperframes": "0.9.80"
+  }
 }

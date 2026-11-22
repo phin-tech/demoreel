@@ -205,3 +205,7 @@ Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole fil
 
 `skills/demoreel/SKILL.md` is this workflow written for a coding agent. Copy it to `~/.claude/skills/demoreel/` to use it
 with Claude Code.
+
+## Licence
+
+Apache-2.0. Copyright 2026 Sam Phinizy. See `LICENSE` and `NOTICE`.
