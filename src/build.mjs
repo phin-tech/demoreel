@@ -6,8 +6,9 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
-// The stage is laid out at 1920x1080 and drawn at twice that, which is what keeps a 4K frame sharp.
-const SCALE = 2;
+// The stage is laid out at 1920x1080 and drawn at twice that, which is what keeps a 4K frame sharp; `scale: 1` or
+// DEMOREEL_SCALE=1 (the CLI's --hd) draws it at 1080p.
+const DEFAULT_SCALE = 2;
 
 const THEME = {
   accent: "#e8a53a",
@@ -27,16 +28,25 @@ export function load(dir) {
   cfg.width ??= 1920;
   cfg.height ??= 1080;
   cfg.fps ??= 30;
+  cfg.scale = Number(process.env.DEMOREEL_SCALE) || cfg.scale || DEFAULT_SCALE;
   cfg.theme = { ...THEME, ...cfg.theme };
   let start = 0;
   cfg.scenes = cfg.scenes.map((scene, i) => {
     const n = String(i + 1).padStart(2, "0");
     const s = { ...scene, n, id: `${n}-${scene.id ?? scene.type}` };
+    // A scene lasts as long as its narration takes to say (its `audioSeconds` if measured, else `wordsPerMinute`) and a short pause, if that is longer
+    // than the scene's own `duration` (a clip's is the clip's length), so the voice is never cut off.
+    const words = cleanNarration(s.narration).split(/\s+/).filter(Boolean).length;
+    // A measured `audioSeconds` (how long the voice really takes) beats the estimate, with a shorter pause after.
+    s.spoken = s.audioSeconds
+      ? Math.ceil((s.audioSeconds + 0.6) * 10) / 10
+      : words ? Math.ceil(((words * 60) / (cfg.wordsPerMinute ?? 150) + 0.8) * 10) / 10 : 0;
     if (s.type === "clip") {
       s.events = JSON.parse(readFileSync(join(dir, s.events), "utf8"));
-      s.duration = s.events.frames / (s.events.fps ?? cfg.fps);
+      s.clipSeconds = s.events.frames / (s.events.fps ?? cfg.fps);
+      s.duration = Math.max(s.clipSeconds, s.spoken);
     } else {
-      s.duration ??= 5;
+      s.duration = Math.max(s.duration ?? 5, s.spoken);
     }
     s.start = start;
     start += s.duration;
@@ -47,14 +57,14 @@ export function load(dir) {
 }
 
 // An image drawn at `width` css pixels is saved at twice that, so the browser never resamples it.
-function image(dir, rel, width, native) {
+function image(dir, rel, width, native, scale) {
   if (native) return rel;
-  const out = join("build", `${basename(rel, extname(rel))}-${width * SCALE}.png`);
+  const out = join("build", `${basename(rel, extname(rel))}-${width * scale}.png`);
   const from = join(dir, rel);
   const to = join(dir, out);
   mkdirSync(join(dir, "build"), { recursive: true });
   if (!existsSync(to) || statSync(to).mtimeMs < statSync(from).mtimeMs) {
-    const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", from, "-vf", `scale=${width * SCALE}:-1:flags=lanczos`, to]);
+    const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", from, "-vf", `scale=${width * scale}:-1:flags=lanczos`, to]);
     if (r.status !== 0) throw new Error(`ffmpeg could not resize ${rel}: ${r.stderr}`);
   }
   return out;
@@ -66,7 +76,7 @@ function textScene(dir, cfg, s, t0) {
   const id = `s${s.n}`;
   const bullets = (s.bullets ?? []).map((b) => `<li><i></i><span>${esc(b)}</span></li>`).join("");
   const cards = (s.cards ?? []).map((c, k) => {
-    const src = image(dir, c.image, c.width, Boolean(c.zoom));
+    const src = image(dir, c.image, c.width, Boolean(c.zoom), cfg.scale);
     return `<div class="card" id="${id}c${k}" style="left:${c.x}px;top:${c.y}px;width:${c.width}px"><img src="${src}" /></div>`;
   }).join("");
   const html = `<div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}">
@@ -93,6 +103,20 @@ function textScene(dir, cfg, s, t0) {
     }
   });
   return { html, js: js.join("\n") };
+}
+
+// A clip shorter than its narration holds its last frame, which ffmpeg makes by cloning it.
+function heldClip(dir, s) {
+  if (s.duration <= s.clipSeconds + 0.05) return s.video;
+  const out = join("build", `${basename(s.video, extname(s.video))}-held-${Math.round(s.duration * 10)}.mp4`);
+  const from = join(dir, s.video);
+  const to = join(dir, out);
+  mkdirSync(join(dir, "build"), { recursive: true });
+  if (!existsSync(to) || statSync(to).mtimeMs < statSync(from).mtimeMs) {
+    const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", from, "-vf", `tpad=stop_mode=clone:stop_duration=${round(s.duration - s.clipSeconds)}`, "-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p", to]);
+    if (r.status !== 0) throw new Error(`ffmpeg could not hold the last frame of ${s.video}: ${r.stderr}`);
+  }
+  return out;
 }
 
 function clipScene(dir, cfg, s, t0) {
@@ -135,7 +159,7 @@ function clipScene(dir, cfg, s, t0) {
   });
 
   // The video is not inside the timed scene div, which would leave the renderer unable to find it, and has an id.
-  const html = `<video id="${id}v" class="clip clipvideo" src="${s.video}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
+  const html = `<video id="${id}v" class="clip clipvideo" src="${heldClip(dir, s)}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
 <div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}">
   ${rings}<div class="cursor" id="${id}cursor"><svg width="34" height="40" viewBox="0 0 17 20"><path d="M1 1 L1 15.5 L5 12 L7.8 18.2 L10.2 17.1 L7.5 11 L13 11 Z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg></div>
   <div class="keys">${keys}</div></div>`;
@@ -144,8 +168,8 @@ function clipScene(dir, cfg, s, t0) {
 
 function page(cfg, parts, total) {
   const t = cfg.theme;
-  const W = cfg.width * SCALE;
-  const H = cfg.height * SCALE;
+  const W = cfg.width * cfg.scale;
+  const H = cfg.height * cfg.scale;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -156,7 +180,7 @@ function page(cfg, parts, total) {
       :root { --ink: ${t.ink}; --accent: ${t.accent}; --muted: ${t.muted}; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: ${W}px; height: ${H}px; overflow: hidden; background: #0e0e11; }
-      #stage { position: absolute; left: 0; top: 0; width: ${cfg.width}px; height: ${cfg.height}px; transform: scale(${SCALE});
+      #stage { position: absolute; left: 0; top: 0; width: ${cfg.width}px; height: ${cfg.height}px; transform: scale(${cfg.scale});
         transform-origin: 0 0; font-family: ${t.font}; background: ${t.background}; overflow: hidden; }
       #stage .scene.clip { position: absolute; left: 0; top: 0; right: auto; bottom: auto; width: ${cfg.width}px; height: ${cfg.height}px; }
       .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
@@ -236,17 +260,51 @@ export function writeStoryboard(dir, cfg, outDir) {
     md.push("", r.narration ? `Narration: ${r.narration}` : "Narration: (none yet)", "");
   }
   writeFileSync(join(outDir, "storyboard.md"), md.join("\n"));
-  // Without audio the sentence timing is only an even split of each scene, so these are a starting point.
+  writeFileSync(join(outDir, "captions.srt"), captions(rows, true));
+}
+
+// Without audio the sentence timing is only an even split of each scene, so captions are a starting point. With
+// `whole` the times run across the film; without, from the start of the one scene.
+function captions(rows, whole) {
   let n = 1;
   const srt = [];
   for (const r of rows) {
+    const base = whole ? r.start : 0;
     const sentences = r.narrationClean.split(/(?<=[.!?])\s+/).filter(Boolean);
     const span = Math.max(0.5, r.duration - 0.6);
     sentences.forEach((text, i) => {
-      const a = r.start + 0.3 + (span * i) / sentences.length;
-      const b = r.start + 0.3 + (span * (i + 1)) / sentences.length;
+      const a = base + 0.3 + (span * i) / sentences.length;
+      const b = base + 0.3 + (span * (i + 1)) / sentences.length;
       srt.push(`${n++}\n${timecode(a)} --> ${timecode(b)}\n${text}\n`);
     });
   }
-  writeFileSync(join(outDir, "captions.srt"), srt.join("\n"));
+  return srt.join("\n");
+}
+
+/** out/vids/scene-NN-id/: each scene's video, narration and captions together, to drag into an editor. */
+export function writeVids(cfg, outDir) {
+  const vids = join(outDir, "vids");
+  rmSync(vids, { recursive: true, force: true });
+  const index = [];
+  for (const s of cfg.scenes) {
+    const folder = join(vids, `scene-${s.id}`);
+    mkdirSync(folder, { recursive: true });
+    copyFileSync(join(outDir, "scenes", `${s.id}.mp4`), join(folder, `${s.id}.mp4`));
+    const row = { narrationClean: cleanNarration(s.narration), duration: s.duration };
+    writeFileSync(join(folder, "narration.txt"), (row.narrationClean || "(no narration yet)") + "\n");
+    if (s.narration) writeFileSync(join(folder, "narration-with-tags.txt"), s.narration + "\n");
+    if (row.narrationClean) writeFileSync(join(folder, "captions.srt"), captions([row], false));
+    index.push(`scene-${s.id}/  ${round(s.duration)}s`);
+  }
+  writeFileSync(join(vids, "HOW-TO.txt"), [
+    `${cfg.title ?? "Demo"}: scenes for an editor`,
+    "",
+    "One folder per scene, in order:",
+    ...index.map((l) => `  ${l}`),
+    "",
+    "In Google Vids: make a new video, upload or drag in each scene's .mp4 in order, and paste that scene's",
+    "narration.txt into its voice-over. narration-with-tags.txt keeps the audio tags for a voice engine that reads them.",
+    "captions.srt times are an even split of the scene, so retime them against real audio.",
+    "",
+  ].join("\n"));
 }

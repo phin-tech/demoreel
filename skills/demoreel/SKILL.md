@@ -30,8 +30,10 @@ Demos are built from a `demo.json` (scenes) and rendered with HyperFrames. Read 
 
 - **Narration tags** (`[enthusiasm]`, `[natural pace]`, `[bold]`) belong to the voice engine, which differs by service. Test one
   scene before using them everywhere. They are stripped for captions and on-screen text.
-- **Scene length follows the voice.** Once there is audio, set each scene's `duration` from the narration's length plus a
-  short pause. Guesses of 5 seconds are placeholders.
+- **Scene length follows the narration.** A scene lasts as long as its narration takes to say (150 words a minute plus a
+  pause) unless its `duration` is longer; a clip holds its last frame. Once a scene has real audio, put its measured length
+  in `audioSeconds`, which beats the estimate. Calibrate `wordsPerMinute` from one measured scene (words ÷ seconds × 60).
+  Keep narration short, since a long line over a still scene drags.
 - **Sharp frames.** The stage is drawn at 2x (a 1920x1080 layout rendered at 3840x2160). Images are resized to exactly
   twice their on-screen width; a `zoom` card uses the original, so keep the zoom to about 1.25x of a 2560px source.
 - **One card per scene, large.** Overlapping window screenshots read as clutter; zoom into the part being discussed.

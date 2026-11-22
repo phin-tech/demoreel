@@ -29,7 +29,7 @@ A folder with `demo.json` and the files it names. Two kinds of scene:
 { "type": "clip", "id": "walk", "video": "walk.mp4", "events": "walk.events.json", "narration": "…" }
 ```
 
-Layout is in a 1920×1080 space. The theme (`accent`, `ink`, `font`, `background`) can be set at the top level under `theme`.
+A scene lasts as long as its `narration` takes to say (150 words a minute, set with `"wordsPerMinute"`, plus a short pause; or a measured `"audioSeconds"` on the scene, which wins) if that is longer than its `duration`, so the voice is never cut off; a clip holds its last frame. Layout is in a 1920×1080 space. The theme (`accent`, `ink`, `font`, `background`) can be set at the top level under `theme`.
 A clip's `events.json` is what the app did and on which frame: `{"fps":30,"frames":165,"events":[{"frame":15,"kind":"key","key":"j"},
 {"frame":107,"kind":"click","x":552,"y":312}]}`, with `x`/`y` in the recorded window's points (1280×801 unless the scene says
 `"window": {"w":…,"h":…}`). Keys, clicks, hovers, scrolls and drags are drawn; keys show as key caps, clicks as rings.

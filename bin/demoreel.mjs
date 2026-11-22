@@ -4,11 +4,12 @@ import { join, resolve, dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { build, removeScenePages, writeStoryboard } from "../src/build.mjs";
+import { build, removeScenePages, writeStoryboard, writeVids } from "../src/build.mjs";
 
 const tool = join(dirname(fileURLToPath(import.meta.url)), "..");
 const hyperframes = join(tool, "node_modules/.bin/hyperframes");
 const [command, ...rest] = process.argv.slice(2);
+if (process.argv.includes("--hd")) process.env.DEMOREEL_SCALE = "1";
 const dir = resolve(rest.find((a) => !a.startsWith("-")) ?? ".");
 
 const usage = `demoreel <command> [project-folder]
@@ -16,8 +17,10 @@ const usage = `demoreel <command> [project-folder]
   build    write index.html and scene-NN.html from demo.json (and resized images in build/)
   lint     build, then HyperFrames' own checks
   render   build, then render the whole film to out/<name>.mp4
-  export   render every scene alone to out/scenes/, with storyboard.md, manifest.json and captions.srt,
-           for an editor such as Google Vids
+  export   render every scene alone, with a folder each in out/vids/ (video, narration, captions) to drag into an
+           editor such as Google Vids, and storyboard.md, manifest.json and captions.srt in out/
+
+Add --hd to draw at 1080p instead of 4K: smaller files, quicker to upload.
 
 The project folder holds demo.json and the files it names. See README.md.`;
 
@@ -47,5 +50,6 @@ if (command === "export") {
     removeScenePages(dir, cfg);
   }
   writeStoryboard(dir, cfg, join(dir, "out"));
-  console.log("wrote out/scenes/*.mp4, out/storyboard.md, out/manifest.json, out/captions.srt");
+  writeVids(cfg, join(dir, "out"));
+  console.log("wrote out/vids/scene-*/ (video, narration, captions), out/storyboard.md, out/manifest.json, out/captions.srt");
 }

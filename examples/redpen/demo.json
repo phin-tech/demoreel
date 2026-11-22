@@ -8,9 +8,22 @@
       "duration": 5,
       "kicker": "Red Pen",
       "title": "Every pull request, in one queue.",
-      "bullets": ["What needs you, first", "New comments and checks, flagged", "Triage without leaving the keyboard"],
-      "cards": [{ "image": "demo-queue.png", "x": 830, "y": 200, "width": 1000, "delay": 0.1 }],
-      "narration": "[enthusiasm] Red Pen puts every pull request in one queue, [natural pace] with what needs you at the top. New comments and failing checks are flagged, and you can triage without leaving the keyboard."
+      "bullets": [
+        "What needs you, first",
+        "New comments and checks, flagged",
+        "Triage without leaving the keyboard"
+      ],
+      "cards": [
+        {
+          "image": "demo-queue.png",
+          "x": 830,
+          "y": 200,
+          "width": 1000,
+          "delay": 0.1
+        }
+      ],
+      "narration": "[enthusiasm] Red Pen puts every pull request in one queue, [natural pace] with what needs you at the top. New comments and failing checks are flagged, and you can triage without leaving the keyboard.",
+      "audioSeconds": 10.4
     },
     {
       "type": "bullets",
@@ -18,8 +31,26 @@
       "duration": 5.5,
       "kicker": "Review",
       "title": "Read the change, not the noise.",
-      "bullets": ["Notes in ink, right on the line", "A diagram of how it fits", "An agent tour of the risky parts"],
-      "cards": [{ "image": "demo-changes.png", "x": 830, "y": 200, "width": 1000, "delay": 0.1, "zoom": { "to": 1.25, "origin": "70% 30%", "at": 2.4, "duration": 2.4 } }],
+      "bullets": [
+        "Notes in ink, right on the line",
+        "A diagram of how it fits",
+        "An agent tour of the risky parts"
+      ],
+      "cards": [
+        {
+          "image": "demo-changes.png",
+          "x": 830,
+          "y": 200,
+          "width": 1000,
+          "delay": 0.1,
+          "zoom": {
+            "to": 1.25,
+            "origin": "70% 30%",
+            "at": 2.4,
+            "duration": 2.4
+          }
+        }
+      ],
       "narration": "Open the changes and read them properly. Leave notes in ink right on the line, see a diagram of how the change fits together, and let an agent walk you through the risky parts."
     },
     {
@@ -35,9 +66,21 @@
       "duration": 5,
       "kicker": "Red Pen",
       "title": "Review faster. Miss less.",
-      "bullets": ["Local, fast, and private", "Works with GitHub and Forgejo"],
-      "cards": [{ "image": "demo-desc.png", "x": 830, "y": 200, "width": 1000, "delay": 0.1 }],
+      "bullets": [
+        "Local, fast, and private",
+        "Works with GitHub and Forgejo"
+      ],
+      "cards": [
+        {
+          "image": "demo-desc.png",
+          "x": 830,
+          "y": 200,
+          "width": 1000,
+          "delay": 0.1
+        }
+      ],
       "narration": "Red Pen is local, fast and private, and it works with GitHub and Forgejo. [bold] Review faster, and miss less."
     }
-  ]
+  ],
+  "wordsPerMinute": 180
 }
