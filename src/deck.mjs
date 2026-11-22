@@ -27,7 +27,7 @@ function slideFile(dir, cfg, s, id, length) {
   <style>
     #${id} { position: absolute; inset: 0; --ink: ${t.ink}; --accent: ${t.accent}; --muted: ${t.muted}; font-family: ${t.font}; background: ${t.background}; overflow: hidden; }
     #${id} .scene.clip { position: absolute; inset: 0; }
-${rules(cfg)}
+${rules}
   </style>
   <div id="${id}" data-composition-id="${id}" data-width="${cfg.width}" data-height="${cfg.height}">
 ${html}
@@ -88,7 +88,7 @@ export function buildDeck(dir) {
     const spots = (s.cards ?? []).filter((c) => c.link).map((c, k) => {
       const target = targetOf(c.link);
       if (!target) throw new Error(`scene ${s.id}: a card links to "${c.link}", which is not a scene marked "branch": true`);
-      const dim = imageSizeOf(dir, c);
+      const dim = imageSize(join(dir, c.image));
       const w = (c.width / cfg.width) * 100;
       const h = dim ? ((c.width * dim.h) / dim.w / cfg.height) * 100 : w * 0.6;
       return { id: `${id(s)}h${k}`, label: c.linkLabel ?? target.title ?? target.id, target: id(target), region: { x: round((c.x / cfg.width) * 100), y: round((c.y / cfg.height) * 100), w: round(w), h: round(h) } };
@@ -116,5 +116,3 @@ ${hosts.join("\n")}
 `);
   return { out, slides: main.length, branches: branches.length };
 }
-
-const imageSizeOf = (dir, card) => imageSize(join(dir, card.image));

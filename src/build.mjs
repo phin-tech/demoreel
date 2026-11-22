@@ -191,9 +191,7 @@ export function clipScene(dir, cfg, s, t0) {
 }
 
 // The look of a scene, shared by the film's page and the deck's slides.
-export const rules = (cfg) => {
-  const t = cfg.theme;
-  return `      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
+export const rules = `      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
       .kicker { color: var(--accent); font-size: 26px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; }
       .title { color: var(--ink); font-size: 66px; font-weight: 700; line-height: 1.06; margin-top: 14px; letter-spacing: -1.5px; text-wrap: balance; }
       .bullets { list-style: none; margin-top: 44px; }
@@ -211,7 +209,6 @@ export const rules = (cfg) => {
       .cap { min-width: 64px; padding: 10px 20px; border-radius: 14px; text-align: center; font-size: 38px; font-weight: 600; color: var(--ink);
         background: rgba(40,38,44,.92); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 -3px 0 rgba(0,0,0,.35); }
 `;
-};
 
 function page(cfg, parts, total, audio = "") {
   const t = cfg.theme;
@@ -230,7 +227,7 @@ function page(cfg, parts, total, audio = "") {
       #stage { position: absolute; left: 0; top: 0; width: ${cfg.width}px; height: ${cfg.height}px; transform: scale(${cfg.scale});
         transform-origin: 0 0; font-family: ${t.font}; background: ${t.background}; overflow: hidden; }
       #stage .scene.clip { position: absolute; left: 0; top: 0; right: auto; bottom: auto; width: ${cfg.width}px; height: ${cfg.height}px; }
-${rules(cfg)}
+${rules}
     </style>
   </head>
   <body>

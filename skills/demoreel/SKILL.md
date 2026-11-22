@@ -24,9 +24,16 @@ installing this skill does not install the tool.
    its events). Put the narration in each scene.
 4. **Check, then render.** `demoreel lint <folder>`, then look at frames before calling it done: render, then pull stills
    with `ffmpeg -ss <t> -i out/x.mp4 -frames:v 1 f.png` and read them. A passing lint does not show how it looks.
-5. **Hand off.** `demoreel export <folder>` writes `out/scenes/*.mp4`, `storyboard.md`, `manifest.json` and
-   `captions.srt`. In Google Vids: new video, import the scene mp4s in order, paste each scene's narration into its
-   voice-over, add music, export. The captions are an even split of each scene, so re-time them against real audio.
+5. **Hand off.** `demoreel export <folder>` writes `out/scenes/*.mp4`, `storyboard.md`, `manifest.json` (with each scene's
+   length and on-screen cues) and `captions.srt`. In Google Vids: new video, import the scene mp4s in order, paste each
+   scene's narration into its voice-over, add music, export. The captions are an even split of each scene, so re-time
+   them against real audio.
+6. **Voice, if the person will record it.** [Booth](https://github.com/phin-tech/booth) opens the folder, plays each
+   exported scene beside its script and records takes to `audio/`; the take it marks is written to `audio/takes.json`
+   and demoreel uses it as the scene's audio (a scene's own `audio` file wins). Rebuild to fit the scenes to the audio.
+7. **A deck, if they want to click through it.** `demoreel present <folder>` serves the same scenes as a slideshow
+   (bullets one per press, narration as notes; a `branch` scene reached from a card's `link`). It stays running; stop it
+   when done.
 
 ## Rules
 
@@ -36,11 +43,11 @@ installing this skill does not install the tool.
   pause) unless its `duration` is longer; a clip holds its last frame. Once a scene has real audio, put its measured length
   in `audioSeconds`, which beats the estimate. Calibrate `wordsPerMinute` from one measured scene (words ÷ seconds × 60).
   Keep narration short, since a long line over a still scene drags.
-- **Sharp frames.** The stage is drawn at 2x (a 1920x1080 layout rendered at 3840x2160). Images are resized to exactly
+- **Sharp frames.** The stage is drawn at 2x (a 1920x1080 layout rendered at 3840x2160); a card's `tilt` swings it in and ends flat. Images are resized to exactly
   twice their on-screen width; a `zoom` card uses the original, so keep the zoom to about 1.25x of a 2560px source.
 - **One card per scene, large.** Overlapping window screenshots read as clutter; zoom into the part being discussed.
 - **Motion is seekable.** Effects are GSAP `tl.to` after a `gsap.set`. Never use `fromTo` for something that should be hidden
   first (it draws its start state at once), no `Date.now()`, no `Math.random()`, no network at render time.
-- **HyperFrames commands.** Use `lint` and `render` only. `share`, `publish` and `auth` upload to HeyGen; `templates` and `billing`
+- **HyperFrames commands.** Use `lint`, `check`, `render` and `present` only. `share`, `publish` and `auth` upload to HeyGen; `templates` and `billing`
   are its paid tier. Turn its usage reporting off once with `hyperframes telemetry disable`.
 - **Do not publish or push** a demo, its repo or its assets unless asked to.
