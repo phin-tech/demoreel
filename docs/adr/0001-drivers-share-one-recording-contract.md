@@ -1,0 +1,68 @@
+# Every driver records the same thing: clean frames and an events file
+
+demoreel's clip scenes show an app being used: a recording with no pointer in it, and an `events.json` saying what was
+done on which frame. The pointer, click rings and key caps are drawn over it afterwards, so they can be restyled without
+recording again. Anything that can drive an app and produce those two files can feed a clip scene.
+
+So demoreel does not drive apps itself, and it does not pick one way of driving. There are several kinds of target, each
+driven by the tool that suits it, and they agree on what comes out.
+
+| Target | Driven by | Frames come from | Runs hidden |
+|---|---|---|---|
+| GPUI apps (Red Pen, Corkboard, Microfiche) | Typecase's driver (`typecase-drive`) | The driver draws the window itself | Yes |
+| Websites | Headless Chrome through `puppeteer-core`, already installed with HyperFrames | Page screenshots, resampled to a steady 30fps | Yes |
+| Swift apps we build | A debug socket in the app, grown from the template's `DebugDriver` | To be decided: the current snapshot draws some views blank | Probably |
+| iOS apps | The simulator: `xcrun simctl` for video, something else to tap | `simctl io recordVideo` | Mostly |
+| Other Mac apps | The Accessibility API | ScreenCaptureKit | No |
+
+## What every driver produces
+
+- **Frames or a video** at a fixed rate (30fps unless told otherwise), with no pointer and no key pill drawn into them.
+  Frame files are numbered from `00000`, so the file number, the `frame` in an event and the index in an encoded video
+  are the same number.
+- **`events.json`**, in the shape `README.md` ("The files other tools can rely on") describes:
+  `{"fps":30,"frames":N,"events":[{"frame":15,"kind":"key","key":"cmd-k"}, …]}`, with `kind` one of `key`, `click`,
+  `hover`, `scroll`, `drag`, and positions in the window's own units measured from its top-left corner (points for a
+  native window, CSS pixels for a page).
+- **No focus taken and no window shown**, wherever the target allows it. A driver that cannot run hidden says so.
+
+Where a driver reads a script, it uses the lines Typecase's does (`click #id`, `click Label`, `type some words`, a key
+name, `wait:600`, `move:X,Y`), so one script can run against whichever driver fits. A driver may add steps of its own.
+
+## Order
+
+1. Typecase's `--events` recording, which writes exactly this and is built (`feat/driver-events`, not yet released),
+   and moving Red Pen onto it in place of `REDPEN_RECORD`.
+2. A web driver, the cheapest and the most useful away from our own apps.
+3. A Swift driver in `apple-template`, after a test of how well a window can be captured, since that is the unknown.
+4. `demoreel record`, which launches a target, runs its script and fills in a clip scene, and pacing a script from the
+   words of recorded narration, which sit on top of any driver.
+
+iOS and other Mac apps wait until something needs them. The Accessibility route needs Accessibility and Screen
+Recording permission and a visible window, and iOS needs a simulator set up first.
+
+## Not chosen
+
+- **An editor inside demoreel or Booth** (a timeline and effects, like Camtasia or Motion). It is a different product
+  and a lot of work, and the part that makes demoreel worth having is that the video is made from a script and recordings,
+  which an editor works against. Finishing by hand goes through the timeline export (`demoreel timeline`) into DaVinci
+  Resolve or Final Cut instead.
+- **HyperFrames' desktop app** as the place to edit. It signs in to a HeyGen account, and what it edits is the HTML that
+  demoreel generates, which is rewritten at the next build.
+- **GPUI for a preview.** There is a GPUI video crate (`gpui-video-player`), but it pins a different GPUI than gpui-kit
+  does and there is no web view in the kit to show demoreel's page.
+
+## Consequences
+
+- Each driver is its own code, in its own place. demoreel only reads the result, so a new kind of target is a new driver
+  and no change here.
+- The contract is shared by repositories: demoreel, Typecase and any app with a driver. Changing the shape of
+  `events.json` means changing all of them together, and the README section is where it is written down.
+- A website cannot be captured at an exact rate in real time, so a web driver timestamps its frames and resamples them.
+- The events a driver writes are as fine as what it does: Typecase writes a `key` event for each typed character, so
+  demoreel has to join a run of typing into one key cap or draws one per letter, which it does not yet do. The Typecase
+  driver also has no scroll or drag step yet.
+- Swift capture is unproven. If a window can only be captured with the Screen Recording permission, that driver cannot
+  run hidden or unattended.
+- What is untested at the time of writing: everything except the Typecase driver, which was run hidden on its `driven`
+  example and rendered through demoreel as a clip scene, looking at three frames and not the motion.
