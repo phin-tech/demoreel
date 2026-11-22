@@ -9,6 +9,8 @@ const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 // The stage is laid out at 1920x1080 and drawn at twice that, which is what keeps a 4K frame sharp; `scale: 1` or
 // DEMOREEL_SCALE=1 (the CLI's --hd) draws it at 1080p.
 const DEFAULT_SCALE = 2;
+// The voice starts this many seconds into its scene, so the picture is there before the first word.
+const DEFAULT_AUDIO_OFFSET = 0.3;
 
 const THEME = {
   accent: "#e8a53a",
@@ -32,7 +34,7 @@ function probeSeconds(file) {
 
 // The voice sits under the scene's own start, as a sibling of the stage, since HyperFrames wants media outside timed elements.
 const audioTag = (s, t0) => s.audio
-  ? `      <audio id="a${s.n}" src="${esc(s.audio)}" data-start="${round(t0 + (s.audioOffset ?? 0.3))}" data-duration="${round(s.audioSeconds)}" data-track-index="2"></audio>`
+  ? `      <audio id="a${s.n}" src="${esc(s.audio)}" data-start="${round(t0 + (s.audioOffset ?? DEFAULT_AUDIO_OFFSET))}" data-duration="${round(s.audioSeconds)}" data-track-index="2"></audio>`
   : "";
 
 export function load(dir) {
@@ -302,7 +304,7 @@ export function writeStoryboard(dir, cfg, outDir) {
     id: s.id, file: `scenes/${s.id}.mp4`, start: round(s.start), duration: round(s.duration), type: s.type,
     onScreen: [s.kicker, s.title, ...(s.bullets ?? [])].filter(Boolean),
     narration: s.narration ?? "", narrationClean: cleanNarration(s.narration), cues: cues(s),
-    audioOffset: s.audioOffset, captions: s.captions,
+    audioOffset: s.audioOffset ?? DEFAULT_AUDIO_OFFSET, captions: s.captions,
   }));
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify({ fps: cfg.fps, total: round(cfg.total), scenes: rows }, null, 2) + "\n");
   const md = [`# ${cfg.title ?? "Demo"}: storyboard`, "", `Total ${round(cfg.total)}s. One mp4 per scene in \`scenes/\`; narration below is the text to voice (tags are for the voice engine; captions have them stripped).`, ""];
@@ -325,7 +327,7 @@ function srt(rows, whole) {
   let n = 1;
   const out = [];
   for (const r of rows) {
-    const base = (whole ? r.start : 0) + (r.audioOffset ?? 0.3);
+    const base = (whole ? r.start : 0) + (r.audioOffset ?? DEFAULT_AUDIO_OFFSET);
     for (const c of r.captions ?? []) out.push(`${n++}\n${timecode(base + c.start)} --> ${timecode(base + c.end)}\n${c.text}\n`);
   }
   return out.join("\n");
@@ -341,7 +343,7 @@ export function writeVids(cfg, outDir) {
     mkdirSync(folder, { recursive: true });
     copyFileSync(join(outDir, "scenes", `${s.id}.mp4`), join(folder, `${s.id}.mp4`));
     if (s.audio) copyFileSync(join(dirname(outDir), s.audio), join(folder, `voice${extname(s.audio)}`));
-    const row = { narrationClean: cleanNarration(s.narration), duration: s.duration, audioOffset: s.audioOffset, captions: s.captions };
+    const row = { narrationClean: cleanNarration(s.narration), duration: s.duration, audioOffset: s.audioOffset ?? DEFAULT_AUDIO_OFFSET, captions: s.captions };
     writeFileSync(join(folder, "narration.txt"), (row.narrationClean || "(no narration yet)") + "\n");
     if (s.narration) writeFileSync(join(folder, "narration-with-tags.txt"), s.narration + "\n");
     if (s.captions?.length) writeFileSync(join(folder, "captions.srt"), srt([row], false));

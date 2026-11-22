@@ -212,6 +212,31 @@ than the scene's title goes in the card's `"linkLabel"`.
 The deck is for presenting from your machine. Nothing here makes a file you can send, and `hyperframes share` and
 `publish` upload to HeyGen, so demoreel doesn't use them.
 
+## The files other tools can rely on
+
+demoreel and [Booth](https://github.com/phin-tech/booth) (a Mac app for recording narration) share three files and nothing
+else. They are the contract; change them together.
+
+**Scene names.** A scene's name is its position and id: `NN-<id>`, `NN` the 1-based position in `scenes` padded to two
+digits, `<id>` the scene's `id` or else its `type`. `02-review` is the second scene, `id: "review"`. The name is used for
+`out/scenes/<name>.mp4`, the folders in `out/vids/`, and the takes.
+
+**`demo.json`** (you write it; Booth edits only a scene's `narration` string, leaving the rest of the file as it was).
+
+**`out/manifest.json`** (`export` writes it; Booth reads it):
+
+```json
+{ "fps": 30, "total": 38.3, "scenes": [
+  { "id": "01-queue", "start": 0, "duration": 11.2, "type": "bullets", "audioOffset": 0.3,
+    "cues": [{ "t": 0.9, "label": "bullet: What needs you, first" }] } ] }
+```
+
+`duration` is the scene's length; `cues` are what happens on screen, in seconds from the start of the scene (bullets, a
+screenshot landing, a click, a key); `audioOffset` is how far into the scene the voice starts.
+
+**`audio/takes.json`** (Booth writes it; demoreel reads it): `{ "01-queue": "01-queue-take-2.wav" }`, the take each scene
+uses, a file in `audio/`. A scene's own `audio` in `demo.json` wins over it.
+
 ## Reference
 
 Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPerMinute` (default 150), `fps` (30),
