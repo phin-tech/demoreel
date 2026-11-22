@@ -111,8 +111,11 @@ function textScene(dir, cfg, s, t0) {
   });
   (s.cards ?? []).forEach((c, k) => {
     const at = t0 + 0.3 + (c.delay ?? 0);
-    js.push(`gsap.set("#${id}c${k}",{opacity:0,y:120});`);
-    js.push(`tl.to("#${id}c${k}",{opacity:1,y:0,duration:.9,ease:"power3.out"},${round(at)});`);
+    // `tilt` (degrees) starts the card turned away in perspective and swings it to face the viewer as it lands,
+    // so it rests flat and its text stays sharp.
+    const tilt = c.tilt ? `,rotationY:${Number(c.tilt)},transformPerspective:1800,transformOrigin:"${c.tilt > 0 ? "0% 50%" : "100% 50%"}"` : "";
+    js.push(`gsap.set("#${id}c${k}",{opacity:0,y:120${tilt}});`);
+    js.push(`tl.to("#${id}c${k}",{opacity:1,y:0${c.tilt ? ",rotationY:0" : ""},duration:${c.tilt ? 1.3 : 0.9},ease:"power3.out"},${round(at)});`);
     // A slow drift after it lands, so it floats, ending with the scene.
     js.push(`tl.to("#${id}c${k}",{y:-10,duration:${round(Math.max(0.5, t0 + s.duration - at - 0.9))},ease:"sine.inOut"},${round(at + 0.9)});`);
     if (c.zoom) {
