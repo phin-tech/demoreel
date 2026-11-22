@@ -206,8 +206,8 @@ export const rules = `      .left { position: absolute; left: 110px; top: 0; bot
       .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
       .ring { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
         border: 4px solid var(--accent); background: rgba(232,165,58,.18); }
-      .keys { position: absolute; left: 0; right: 0; bottom: 36px; display: flex; justify-content: center; }
-      .keyset { position: absolute; display: flex; gap: 10px; }
+      .keys { position: absolute; left: 0; right: 0; bottom: 36px; height: 0; }
+      .keyset { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 10px; }
       .cap { min-width: 64px; padding: 10px 20px; border-radius: 14px; text-align: center; font-size: 38px; font-weight: 600; color: var(--ink);
         background: rgba(40,38,44,.92); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 -3px 0 rgba(0,0,0,.35); }
 `;
