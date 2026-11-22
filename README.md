@@ -1,44 +1,207 @@
 # demoreel
 
-Product demo videos from code. A scripted recording of an app, floating screenshots with bullets, a drawn pointer, click
-rings and key caps, narration, and captions, rendered at 4K with [HyperFrames](https://github.com/heygen-com/hyperframes)
-(Apache-2.0). It can also render each scene as its own mp4 with a storyboard, so the pieces can go into Google Vids or
-another editor.
+Make a product demo video from code: your app's screenshots floating over a title and bullets, a clip of the app being
+used with a drawn pointer, click rings and key caps, and narration, rendered at 4K by
+[HyperFrames](https://github.com/heygen-com/hyperframes) (HeyGen, Apache-2.0). It can also hand you each scene as its own
+folder of video, narration and captions, to drag into Google Vids or any editor.
 
-## Use
+This is a hands-on tutorial. By the end you will have rendered the example, made a demo of your own, and exported it
+scene by scene. It takes about half an hour, most of it waiting for renders.
+
+## 0. What you need
+
+- Node 22 or newer (`node --version`)
+- ffmpeg (`brew install ffmpeg`)
+- Chrome or Chromium. HyperFrames uses its own bundled copy; `npx hyperframes doctor` checks that your machine has what
+  it needs.
+
+## 1. Install and render the example
 
 ```bash
-npm install                                  # once: HyperFrames, pinned
-npx hyperframes telemetry disable            # once: it reports anonymous usage by default
-node bin/demoreel.mjs render examples/redpen   # → examples/redpen/out/redpen-demo.mp4
-node bin/demoreel.mjs export examples/redpen   # → out/scenes/*.mp4, storyboard.md, manifest.json, captions.srt
+git clone https://github.com/phin-tech/demoreel && cd demoreel
+npm install
+npx hyperframes telemetry disable     # HyperFrames reports anonymous usage by default; this turns it off
+alias demoreel="node $PWD/bin/demoreel.mjs"
+
+demoreel render examples/redpen       # about 25 seconds
+open examples/redpen/out/redpen-demo.mp4
 ```
 
-Needs Node 22+, ffmpeg and Chrome (HyperFrames downloads its own). `lint` runs HyperFrames' checks; `build` only writes the HTML.
+You get a 4K video of four scenes: a title with bullets and a floating screenshot, the same with a slow zoom, a clip of an
+app being used with a pointer and key caps, and a closing scene. Everything in it came from one file,
+`examples/redpen/demo.json`. Open that file next to the video; the rest of the tutorial is about changing it.
 
-## A project
+## 2. Make your own demo
 
-A folder with `demo.json` and the files it names. Two kinds of scene:
+Copy the example and clear out what you don't need:
 
-```jsonc
-{ "type": "bullets", "id": "queue", "duration": 5, "kicker": "Red Pen", "title": "…", "bullets": ["…"],
-  "cards": [{ "image": "queue.png", "x": 830, "y": 200, "width": 1000, "delay": 0.1,
-              "zoom": { "to": 1.25, "origin": "70% 30%", "at": 2.4, "duration": 2.4 } }],   // zoom is optional
-  "narration": "[enthusiasm] Text to voice." }
-
-{ "type": "clip", "id": "walk", "video": "walk.mp4", "events": "walk.events.json", "narration": "…" }
+```bash
+cp -R examples/redpen my-demo
+rm -rf my-demo/out my-demo/build
 ```
 
-A scene lasts as long as its `narration` takes to say (150 words a minute, set with `"wordsPerMinute"`, plus a short pause; or a measured `"audioSeconds"` on the scene, which wins) if that is longer than its `duration`, so the voice is never cut off; a clip holds its last frame. Layout is in a 1920×1080 space. The theme (`accent`, `ink`, `font`, `background`) can be set at the top level under `theme`.
-A clip's `events.json` is what the app did and on which frame: `{"fps":30,"frames":165,"events":[{"frame":15,"kind":"key","key":"j"},
-{"frame":107,"kind":"click","x":552,"y":312}]}`, with `x`/`y` in the recorded window's points (1280×801 unless the scene says
-`"window": {"w":…,"h":…}`). Keys, clicks, hovers, scrolls and drags are drawn; keys show as key caps, clicks as rings.
+Put your own screenshots in `my-demo/` (PNG, taken at your app's real window size). Then open `my-demo/demo.json`.
 
-## Recording an app
+### A title scene
 
-demoreel doesn't record. The app drives itself and writes frames and `events.json`. Red Pen does this with
-`REDPEN_KEYS="…" just record <name>`; encode the frames with ffmpeg. Another app needs only the same two outputs.
+Delete every scene but the first and edit it:
 
-## With an agent
+```json
+{
+  "name": "my-demo",
+  "title": "My app demo",
+  "scenes": [
+    {
+      "type": "bullets",
+      "id": "intro",
+      "duration": 5,
+      "kicker": "My App",
+      "title": "One line that says what it is.",
+      "bullets": ["First thing it does", "Second thing", "Third thing"],
+      "cards": [{ "image": "my-screenshot.png", "x": 830, "y": 200, "width": 1000 }]
+    }
+  ]
+}
+```
 
-`skills/demoreel/SKILL.md` is the workflow written for an agent. Copy or link it into `~/.claude/skills/demoreel/` to use it.
+Layout is in a 1920×1080 space. The text sits on the left; a `card` is a screenshot with a rounded window and shadow. `x`,
+`y` and `width` place it, and it floats in from below. Render it and look:
+
+```bash
+demoreel render my-demo
+open my-demo/out/my-demo.mp4
+```
+
+Add `"zoom": { "to": 1.25, "origin": "70% 30%", "at": 2.4, "duration": 2.4 }` to a card to push in on one part of it
+(`origin` is the point it zooms toward, `at` is when it starts, in seconds). Keep `to` near 1.25 for a 2560px-wide
+screenshot; more than that and it goes soft.
+
+One large card per scene reads better than several overlapping.
+
+### A clip scene: the app being used
+
+A `clip` scene is a video of your app plus a list of what was done on which frame. The pointer, click rings and key caps
+are drawn over the video from that list; they are not in the video itself.
+
+You need two files:
+
+- `walk.mp4`, a recording of the app, with no pointer visible
+- `walk.events.json`, the list:
+
+```json
+{
+  "fps": 30,
+  "frames": 165,
+  "events": [
+    { "frame": 15,  "kind": "key",    "key": "j" },
+    { "frame": 38,  "kind": "key",    "key": "cmd-k" },
+    { "frame": 76,  "kind": "scroll", "x": 960, "y": 512, "dy": 500 },
+    { "frame": 107, "kind": "click",  "x": 552, "y": 312 }
+  ]
+}
+```
+
+`frames` is the number of frames in the clip. `x` and `y` are in the recorded window's own units (points), measured
+from its top-left; if the window is not 1280×801, say so on the scene with `"window": { "w": 1440, "h": 900 }`. Kinds are
+`key` (`cmd-k`, `shift-enter`, `escape`), `click`, `hover`, `scroll` and `drag`. Keys show as key caps, clicks as an amber
+ring, and the pointer glides to each position just before it happens.
+
+Add it as a second scene:
+
+```json
+{ "type": "clip", "id": "walk", "video": "walk.mp4", "events": "walk.events.json" }
+```
+
+**No way to record your app?** Any screen recording works. Record it with QuickTime, with the cursor hidden if you can, and
+write the events by hand: watch the video, note the frame of each click or key (frames = seconds × 30), and read the
+coordinates off a screenshot of the same window. It is fiddly the first time and quick after that.
+
+**Your app can drive itself?** Better. Have it save a frame after every step and write the events as it goes, so the
+list can never drift from what happened. Red Pen does this with `REDPEN_KEYS="…" just record <name>`, which is the
+reference for how. Encode the frames with ffmpeg:
+
+```bash
+ffmpeg -framerate 30 -i frames/%05d.png -c:v libx264 -crf 14 -pix_fmt yuv420p walk.mp4
+```
+
+## 3. Add narration
+
+Put the words on each scene:
+
+```json
+{ "type": "bullets", "id": "intro", "...": "...",
+  "narration": "[enthusiasm] My App puts everything in one place. [natural pace] Here is how it works." }
+```
+
+Text in square brackets is for a voice engine that understands audio tags; the captions and the plain-text narration have
+them stripped. Not every engine reads them, so test one line first.
+
+A scene now lasts as long as its narration takes to say, so the voice is never cut off. By default that is 150 words a
+minute plus a short pause, and `duration` is the minimum. Two ways to make it accurate:
+
+- Set `"wordsPerMinute": 180` at the top of `demo.json` to match the voice you'll use. To find your number, read one scene
+  to the voice and compute words ÷ seconds × 60.
+- Once a scene has real audio, put its length on the scene as `"audioSeconds": 10.4`. That beats any estimate.
+
+A clip shorter than its narration holds its last frame.
+
+Keep the lines short. A long line over a still scene drags, and the fix is usually fewer words rather than a longer scene.
+
+## 4. Check before you trust it
+
+```bash
+demoreel lint my-demo
+```
+
+This runs HyperFrames' own checks. Errors matter; the "sub-composition" warnings are suggestions you can ignore. Then
+look at actual frames, because a passing lint doesn't show how it looks:
+
+```bash
+ffmpeg -ss 3 -i my-demo/out/my-demo.mp4 -frames:v 1 frame.png
+```
+
+## 5. Export for an editor
+
+```bash
+demoreel export my-demo --hd
+```
+
+`--hd` draws at 1080p (smaller files, quicker to upload); leave it off for 4K. This renders every scene alone and writes:
+
+```
+my-demo/out/vids/
+  HOW-TO.txt
+  scene-01-intro/   01-intro.mp4 · narration.txt · narration-with-tags.txt · captions.srt
+  scene-02-walk/    …
+```
+
+Drag a scene's mp4 into Google Vids (or any editor), paste its `narration.txt` into the voice-over, and add music. The
+captions are an even split of each scene, so retime them once you have real audio. `out/storyboard.md` and
+`out/manifest.json` hold the whole plan, if you want it in one place.
+
+## Reference
+
+Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPerMinute` (default 150), `fps` (30),
+`scale` (2 is 4K, 1 is 1080p; `--hd` sets 1), `theme` (`accent`, `ink`, `muted`, `font`, `background`).
+
+`bullets` scene: `id`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audioSeconds`.
+Card: `image`, `x`, `y`, `width`, `delay`, `zoom` (`to`, `origin`, `at`, `duration`).
+
+`clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
+fractions of the window where it starts; default 0.55, 0.6), `narration`, `audioSeconds`.
+
+Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`.
+
+## Troubleshooting
+
+- **A video in the render is frozen.** A `<video>` must not sit inside a timed element and needs an `id`; demoreel does
+  this for you, so a hand edit to the generated HTML probably broke it. Run `demoreel lint`.
+- **Text looks fuzzy.** Use `scale: 2` (the default), keep screenshots at their real size, and don't zoom past about 1.25×.
+- **A click ring or key cap shows before it should.** In your own GSAP edits, use `gsap.set` then `tl.to`, never `fromTo`,
+  which draws its first state immediately.
+- **`share`, `publish` and `auth`** are HyperFrames commands that upload to HeyGen's servers. demoreel never uses them.
+
+## Using it with an agent
+
+`skills/demoreel/SKILL.md` is this workflow written for a coding agent. Copy it to `~/.claude/skills/demoreel/` to use it
+with Claude Code.
