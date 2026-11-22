@@ -20,8 +20,23 @@ import { applySession, bounced, captureSession, readSession, writeSession } from
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 const STEP_PAUSE = 120;
 const TYPE_PAUSE = 60;
+const CAPTURE_TIMEOUT = 4000; // ms before one screenshot is given up on
+const MAX_FAILURES = 25; // in a row, before the recording stops
 const KEYS = { enter: "Enter", escape: "Escape", esc: "Escape", tab: "Tab", backspace: "Backspace", space: " ", up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
 const MODS = { cmd: "Meta", ctrl: "Control", alt: "Alt", shift: "Shift" };
+
+/** The promise's result, or a rejection if it takes longer than `ms`. */
+function withTimeout(promise, ms) {
+  let timer;
+  return Promise.race([promise, new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`no answer in ${ms}ms`)), ms); })]).finally(() => clearTimeout(timer));
+}
+
+/** Opens a page and waits for it to load, then for the network to go quiet, but not forever: pages with a socket or a
+ *  poll never go idle. */
+async function open(page, url) {
+  await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  await page.waitForNetworkIdle({ idleTime: 500, timeout: 5000 }).catch(() => {});
+}
 
 export function findChrome() {
   if (process.env.DEMOREEL_CHROME) return process.env.DEMOREEL_CHROME;
@@ -69,7 +84,7 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     const page = await browser.newPage();
     await page.setViewport({ ...viewport, deviceScaleFactor: scale });
     if (r.session) await applySession(page, readSession(resolve(dir, r.session)));
-    await page.goto(url, { waitUntil: "networkidle0" });
+    await open(page, url);
     if (r.session && bounced(url, page.url())) {
       throw new Error(`scene ${scene.id}: asked for ${url} but landed on ${page.url()}: the session has probably expired, so run \`demoreel login\` again`);
     }
@@ -80,16 +95,26 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     const cdp = await page.createCDPSession();
     const shown = []; // { t, file }
     let recording = true;
+    // A capture that stalls (Chrome can hang one while a page is navigating) or fails is skipped and the last frame held;
+    // it only stops the recording when they keep failing, so one bad frame never loses the run.
+    let failures = 0;
     const grab = async () => {
       const t = Date.now() / 1000;
       const file = join(work, `shot-${String(shown.length).padStart(6, "0")}.png`);
-      const { data } = await cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true, captureBeyondViewport: false });
-      writeFileSync(file, Buffer.from(data, "base64"));
-      shown.push({ t, file });
+      try {
+        const { data } = await withTimeout(cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true, captureBeyondViewport: false }), CAPTURE_TIMEOUT);
+        writeFileSync(file, Buffer.from(data, "base64"));
+        shown.push({ t, file });
+        failures = 0;
+      } catch (e) {
+        if (!shown.length || ++failures > MAX_FAILURES) throw new Error(`the page could not be captured: ${e.message}`);
+        await sleep(100);
+      }
     };
     await grab();
     const t0 = shown[0].t;
-    const capturing = (async () => { while (recording) await grab(); })();
+    let captureError = null;
+    const capturing = (async () => { try { while (recording) await grab(); } catch (e) { captureError = e; recording = false; } })();
 
     const events = [];
     const now = () => Date.now() / 1000;
@@ -125,7 +150,7 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     for (const step of plan) {
       const [verb, arg] = Object.entries(step)[0];
       if (verb === "wait") { await sleep(Number(arg) || 500); continue; }
-      if (verb === "goto") { await page.goto(/^[a-z]+:\/\//.test(arg) ? arg : pathToFileURL(resolve(dir, arg)).href, { waitUntil: "networkidle0" }); }
+      if (verb === "goto") { await open(page, /^[a-z]+:\/\//.test(arg) ? arg : pathToFileURL(resolve(dir, arg)).href); }
       else if (verb === "click") {
         const at = /^\d/.test(arg) ? Object.fromEntries(["x", "y"].map((k, i) => [k, Number(arg.split(",")[i])])) : await where(arg);
         await page.mouse.move(at.x, at.y, { steps: 12 });
@@ -153,6 +178,7 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     await sleep(400);
     recording = false;
     await capturing;
+    if (captureError) throw captureError;
     const end = Date.now() / 1000;
 
     // The frame for each tick of the steady rate is the latest one taken by then; the file number is the frame number.
