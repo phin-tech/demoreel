@@ -1,0 +1,7 @@
+{"fps":30,"frames":165,"events":[
+{"frame":15,"kind":"key","key":"j"},
+{"frame":38,"kind":"key","key":"c"},
+{"frame":76,"kind":"scroll","x":960,"y":512,"dy":500},
+{"frame":107,"kind":"click","x":552,"y":312,"held":""},
+{"frame":134,"kind":"scroll","x":960,"y":512,"dy":450}
+]}

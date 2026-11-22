@@ -1,0 +1,11 @@
+{
+  "name": "demoreel",
+  "version": "0.1.0",
+  "description": "Product demo videos from code: scripted app recordings, floating screens, bullets, a pointer, key caps and narration, rendered with HyperFrames and exportable one scene at a time.",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "bin": { "demoreel": "bin/demoreel.mjs" },
+  "engines": { "node": ">=22" },
+  "dependencies": { "hyperframes": "0.9.80" }
+}
