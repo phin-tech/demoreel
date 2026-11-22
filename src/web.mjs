@@ -20,8 +20,8 @@ import { applySession, bounced, captureSession, readSession, writeSession } from
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 const STEP_PAUSE = 120;
 const TYPE_PAUSE = 60;
-const CAPTURE_TIMEOUT = 4000; // ms before one screenshot is given up on
-const MAX_FAILURES = 25; // in a row, before the recording stops
+const CAPTURE_TIMEOUT = 1500; // ms before one screenshot is given up on (one in flight when the page navigates is never answered)
+const MAX_FAILURES = 20; // in a row, before the recording stops
 const KEYS = { enter: "Enter", escape: "Escape", esc: "Escape", tab: "Tab", backspace: "Backspace", space: " ", up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
 const MODS = { cmd: "Meta", ctrl: "Control", alt: "Alt", shift: "Shift" };
 
@@ -31,10 +31,10 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`no answer in ${ms}ms`)), ms); })]).finally(() => clearTimeout(timer));
 }
 
-/** Opens a page and waits for it to load, then for the network to go quiet, but not forever: pages with a socket or a
- *  poll never go idle. */
+/** Opens a page and waits for its document, then for the network to go quiet, but not for long: a page with a socket, a
+ *  poll or a slow third-party image never goes idle, and `load` waits for those, so neither may hold the recording up. */
 async function open(page, url) {
-  await page.goto(url, { waitUntil: "load", timeout: 60000 });
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForNetworkIdle({ idleTime: 500, timeout: 5000 }).catch(() => {});
 }
 
