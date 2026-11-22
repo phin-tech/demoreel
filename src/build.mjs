@@ -89,7 +89,7 @@ function image(dir, rel, width, native, scale) {
 
 // Every effect is a plain `tl.to` after a `gsap.set`, since a `fromTo` draws its first state at once and would
 // show a click ring or key cap before its time.
-function textScene(dir, cfg, s, t0) {
+export function textScene(dir, cfg, s, t0, opts = {}) {
   const id = `s${s.n}`;
   const bullets = (s.bullets ?? []).map((b) => `<li><i></i><span>${esc(b)}</span></li>`).join("");
   const cards = (s.cards ?? []).map((c, k) => {
@@ -107,7 +107,7 @@ function textScene(dir, cfg, s, t0) {
   js.push(`tl.to("#${id} .kicker, #${id} .title",{opacity:1,y:0,duration:.6,ease:"power3.out",stagger:.1},${round(t0 + 0.15)});`);
   (s.bullets ?? []).forEach((_, k) => {
     js.push(`gsap.set("#${id} .bullets li:nth-child(${k + 1})",{opacity:0,x:-40});`);
-    js.push(`tl.to("#${id} .bullets li:nth-child(${k + 1})",{opacity:1,x:0,duration:.5,ease:"power3.out"},${round(t0 + 0.9 + k * 0.35)});`);
+    js.push(`tl.to("#${id} .bullets li:nth-child(${k + 1})",{opacity:1,x:0,duration:.5,ease:"power3.out"},${round(opts.deck ? t0 + 1.5 + k : t0 + 0.9 + k * 0.35)});`);
   });
   (s.cards ?? []).forEach((c, k) => {
     const at = t0 + 0.3 + (c.delay ?? 0);
@@ -139,7 +139,7 @@ function heldClip(dir, s) {
   return out;
 }
 
-function clipScene(dir, cfg, s, t0) {
+export function clipScene(dir, cfg, s, t0) {
   const id = `s${s.n}`;
   const win = s.window ?? { w: 1280, h: 801 };
   const card = { x: 180, y: 70, width: 1560, ...s.card };
@@ -186,6 +186,29 @@ function clipScene(dir, cfg, s, t0) {
   return { html, js: js.join("\n") };
 }
 
+// The look of a scene, shared by the film's page and the deck's slides.
+export const rules = (cfg) => {
+  const t = cfg.theme;
+  return `      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
+      .kicker { color: var(--accent); font-size: 26px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; }
+      .title { color: var(--ink); font-size: 66px; font-weight: 700; line-height: 1.06; margin-top: 14px; letter-spacing: -1.5px; text-wrap: balance; }
+      .bullets { list-style: none; margin-top: 44px; }
+      .bullets li { display: flex; align-items: center; gap: 20px; margin-bottom: 22px; }
+      .bullets i { width: 14px; height: 14px; border-radius: 7px; background: var(--accent); flex: none; }
+      .bullets span { color: var(--ink); font-size: 36px; font-weight: 500; }
+      .card { position: absolute; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+      .card img, .card video { width: 100%; display: block; }
+      .clipvideo { position: absolute; object-fit: cover; border-radius: 18px; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+      .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
+      .ring { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
+        border: 4px solid var(--accent); background: rgba(232,165,58,.18); }
+      .keys { position: absolute; left: 0; right: 0; bottom: 36px; display: flex; justify-content: center; }
+      .keyset { position: absolute; display: flex; gap: 10px; }
+      .cap { min-width: 64px; padding: 10px 20px; border-radius: 14px; text-align: center; font-size: 38px; font-weight: 600; color: var(--ink);
+        background: rgba(40,38,44,.92); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 -3px 0 rgba(0,0,0,.35); }
+`;
+};
+
 function page(cfg, parts, total, audio = "") {
   const t = cfg.theme;
   const W = cfg.width * cfg.scale;
@@ -203,23 +226,7 @@ function page(cfg, parts, total, audio = "") {
       #stage { position: absolute; left: 0; top: 0; width: ${cfg.width}px; height: ${cfg.height}px; transform: scale(${cfg.scale});
         transform-origin: 0 0; font-family: ${t.font}; background: ${t.background}; overflow: hidden; }
       #stage .scene.clip { position: absolute; left: 0; top: 0; right: auto; bottom: auto; width: ${cfg.width}px; height: ${cfg.height}px; }
-      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
-      .kicker { color: var(--accent); font-size: 26px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; }
-      .title { color: var(--ink); font-size: 66px; font-weight: 700; line-height: 1.06; margin-top: 14px; letter-spacing: -1.5px; text-wrap: balance; }
-      .bullets { list-style: none; margin-top: 44px; }
-      .bullets li { display: flex; align-items: center; gap: 20px; margin-bottom: 22px; }
-      .bullets i { width: 14px; height: 14px; border-radius: 7px; background: var(--accent); flex: none; }
-      .bullets span { color: var(--ink); font-size: 36px; font-weight: 500; }
-      .card { position: absolute; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
-      .card img, .card video { width: 100%; display: block; }
-      .clipvideo { position: absolute; object-fit: cover; border-radius: 18px; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
-      .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
-      .ring { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
-        border: 4px solid var(--accent); background: rgba(232,165,58,.18); }
-      .keys { position: absolute; left: 0; right: 0; bottom: 36px; display: flex; justify-content: center; }
-      .keyset { position: absolute; display: flex; gap: 10px; }
-      .cap { min-width: 64px; padding: 10px 20px; border-radius: 14px; text-align: center; font-size: 38px; font-weight: 600; color: var(--ink);
-        background: rgba(40,38,44,.92); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 -3px 0 rgba(0,0,0,.35); }
+${rules(cfg)}
     </style>
   </head>
   <body>

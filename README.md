@@ -186,18 +186,37 @@ Drag a scene's mp4 into Google Vids (or any editor), paste its `narration.txt` i
 captions are an even split of each scene, so retime them once you have real audio. `out/storyboard.md` and
 `out/manifest.json` hold the whole plan, if you want it in one place.
 
+## 6. Make a deck to click through
+
+The same `demo.json` can be a slideshow instead of a video:
+
+```bash
+demoreel present my-demo        # builds my-demo/deck/ and serves it on http://localhost:3004
+```
+
+Each scene is a slide. Click the page once, then **→** (or Space) brings in the next bullet and then the next slide, **←**
+goes back, **P** opens the audience window and **F** goes fullscreen. A clip scene plays its clip. The narration becomes
+the speaker notes. `demoreel deck my-demo` only writes `my-demo/deck/`, and Ctrl+C stops `present`.
+
+To branch, mark a scene `"branch": true` (it is left out of the main line) and give a card on another slide
+`"link": "<that scene's id>"`. The card gets a button; clicking it opens the branch scene, and **←** returns. A label other
+than the scene's title goes in the card's `"linkLabel"`.
+
+The deck is for presenting from your machine. Nothing here makes a file you can send, and `hyperframes share` and
+`publish` upload to HeyGen, so demoreel doesn't use them.
+
 ## Reference
 
 Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPerMinute` (default 150), `fps` (30),
 `scale` (2 is 4K, 1 is 1080p; `--hd` sets 1), `theme` (`accent`, `ink`, `muted`, `font`, `background`).
 
-`bullets` scene: `id`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
-Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `zoom` (`to`, `origin`, `at`, `duration`).
+`bullets` scene: `id`, `branch`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
+Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `link`, `linkLabel`, `zoom` (`to`, `origin`, `at`, `duration`).
 
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
 fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
 
-Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`.
+Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `deck`; `present`.
 
 ## Troubleshooting
 
