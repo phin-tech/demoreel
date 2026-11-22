@@ -145,6 +145,10 @@ minute plus a short pause, and `duration` is the minimum. Two ways to make it ac
 
 A clip shorter than its narration holds its last frame.
 
+**Recorded or generated audio.** Put the file on the scene, `"audio": "intro.wav"` (anything ffmpeg reads), and demoreel
+measures it, sets the scene's length to fit with a short pause after, and mixes it into the video starting 0.3 seconds in
+(`"audioOffset"` changes that). No need to type `audioSeconds`. Exports also copy it into the scene's folder as `voice.*`.
+
 Keep the lines short. A long line over a still scene drags, and the fix is usually fewer words rather than a longer scene.
 
 ## 4. Check before you trust it
@@ -184,11 +188,11 @@ captions are an even split of each scene, so retime them once you have real audi
 Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPerMinute` (default 150), `fps` (30),
 `scale` (2 is 4K, 1 is 1080p; `--hd` sets 1), `theme` (`accent`, `ink`, `muted`, `font`, `background`).
 
-`bullets` scene: `id`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audioSeconds`.
+`bullets` scene: `id`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
 Card: `image`, `x`, `y`, `width`, `delay`, `zoom` (`to`, `origin`, `at`, `duration`).
 
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
-fractions of the window where it starts; default 0.55, 0.6), `narration`, `audioSeconds`.
+fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
 
 Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`.
 

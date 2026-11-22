@@ -23,6 +23,18 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const round = (n) => Math.round(n * 1000) / 1000;
 export const cleanNarration = (s = "") => s.replace(/\[[^\]]*\]\s*/g, "").replace(/\s+/g, " ").trim();
 
+function probeSeconds(file) {
+  const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8" });
+  const seconds = parseFloat(r.stdout);
+  if (r.status !== 0 || !(seconds > 0)) throw new Error(`ffprobe could not read the length of ${file}: ${r.stderr}`);
+  return seconds;
+}
+
+// The voice sits under the scene's own start, as a sibling of the stage, since HyperFrames wants media outside timed elements.
+const audioTag = (s, t0) => s.audio
+  ? `      <audio id="a${s.n}" src="${esc(s.audio)}" data-start="${round(t0 + (s.audioOffset ?? 0.3))}" data-duration="${round(s.audioSeconds)}" data-track-index="2"></audio>`
+  : "";
+
 export function load(dir) {
   const cfg = JSON.parse(readFileSync(join(dir, "demo.json"), "utf8"));
   cfg.width ??= 1920;
@@ -36,6 +48,11 @@ export function load(dir) {
     const s = { ...scene, n, id: `${n}-${scene.id ?? scene.type}` };
     // A scene lasts as long as its narration takes to say (its `audioSeconds` if measured, else `wordsPerMinute`) and a short pause, if that is longer
     // than the scene's own `duration` (a clip's is the clip's length), so the voice is never cut off.
+    // A recorded `audio` file is measured, and that is its `audioSeconds`.
+    if (s.audio) {
+      if (!existsSync(join(dir, s.audio))) throw new Error(`scene ${s.id}: audio file ${s.audio} not found`);
+      s.audioSeconds = probeSeconds(join(dir, s.audio));
+    }
     const words = cleanNarration(s.narration).split(/\s+/).filter(Boolean).length;
     // A measured `audioSeconds` (how long the voice really takes) beats the estimate, with a shorter pause after.
     s.spoken = s.audioSeconds
@@ -166,7 +183,7 @@ function clipScene(dir, cfg, s, t0) {
   return { html, js: js.join("\n") };
 }
 
-function page(cfg, parts, total) {
+function page(cfg, parts, total, audio = "") {
   const t = cfg.theme;
   const W = cfg.width * cfg.scale;
   const H = cfg.height * cfg.scale;
@@ -207,6 +224,7 @@ function page(cfg, parts, total) {
       <div id="stage">
 ${parts.map((p) => p.html).join("\n")}
       </div>
+${audio}
     </div>
     <script>
       const tl = gsap.timeline({ paused: true });
@@ -230,10 +248,10 @@ export function build(dir, { scenes = false } = {}) {
   const cfg = load(dir);
   mkdirSync(join(dir, "build"), { recursive: true });
   copyFileSync(join(TOOL, "node_modules/hyperframes/dist/vendor/npm/gsap@3.15.0/dist/gsap.min.js"), join(dir, "build/gsap.min.js"));
-  writeFileSync(join(dir, "index.html"), page(cfg, cfg.scenes.map((s) => make(dir, cfg, s, s.start)), cfg.total));
+  writeFileSync(join(dir, "index.html"), page(cfg, cfg.scenes.map((s) => make(dir, cfg, s, s.start)), cfg.total, cfg.scenes.map((s) => audioTag(s, s.start)).filter(Boolean).join("\n")));
   if (!scenes) removeScenePages(dir, cfg);
   if (scenes) {
-    for (const s of cfg.scenes) writeFileSync(join(dir, `scene-${s.n}.html`), page(cfg, [make(dir, cfg, s, 0)], s.duration));
+    for (const s of cfg.scenes) writeFileSync(join(dir, `scene-${s.n}.html`), page(cfg, [make(dir, cfg, s, 0)], s.duration, audioTag(s, 0)));
   }
   return cfg;
 }
@@ -290,6 +308,7 @@ export function writeVids(cfg, outDir) {
     const folder = join(vids, `scene-${s.id}`);
     mkdirSync(folder, { recursive: true });
     copyFileSync(join(outDir, "scenes", `${s.id}.mp4`), join(folder, `${s.id}.mp4`));
+    if (s.audio) copyFileSync(join(dirname(outDir), s.audio), join(folder, `voice${extname(s.audio)}`));
     const row = { narrationClean: cleanNarration(s.narration), duration: s.duration };
     writeFileSync(join(folder, "narration.txt"), (row.narrationClean || "(no narration yet)") + "\n");
     if (s.narration) writeFileSync(join(folder, "narration-with-tags.txt"), s.narration + "\n");
