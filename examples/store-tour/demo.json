@@ -1,0 +1,31 @@
+{
+  "name": "store-tour",
+  "title": "Phin Tech Software Store tour",
+  "scenes": [
+    {
+      "type": "bullets",
+      "id": "intro",
+      "duration": 4,
+      "kicker": "Phin Tech",
+      "title": "A software store for Mac.",
+      "bullets": ["Every app in one place", "A box and a page for each", "Free to download"],
+      "narration": "The Phin Tech Software Store puts every app in one place.\nEach one gets its own box and its own page."
+    },
+    {
+      "type": "clip",
+      "id": "browse",
+      "record": { "driver": "web", "url": "http://localhost:8787/apps/index.html", "script": "web.script",
+                  "viewport": { "width": 1280, "height": 800 } },
+      "narration": "Scroll the shelves to see what's there.\nPick a box to read about the app."
+    },
+    {
+      "type": "bullets",
+      "id": "outro",
+      "duration": 3,
+      "kicker": "Get it",
+      "title": "Take the whole store home.",
+      "bullets": ["Download for Mac", "apps.phin.tech"],
+      "narration": "Download the store, and take it all home."
+    }
+  ]
+}

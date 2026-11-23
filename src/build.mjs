@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, copyFileS
 import { join, basename, extname, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { esc, round } from "./util.mjs";
+import { diagramImage, hubBlock, hubVariables } from "./diagram.mjs";
 import { fileURLToPath } from "node:url";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -93,6 +94,20 @@ export function load(dir) {
     s.spoken = s.audioSeconds
       ? Math.ceil((s.audioSeconds + 0.6) * 10) / 10
       : words ? Math.ceil(((words * 60) / (cfg.wordsPerMinute ?? 150) + 0.8) * 10) / 10 : 0;
+    if (s.type === "diagram") {
+      // A diagram is a title across the top and the picture under it, centered across the frame.
+      const width = s.width ?? (s.hub ? 1500 : 1700);
+      const x = Math.round((cfg.width - width) / 2);
+      if (s.hub) {
+        // HyperFrames' hub-and-spokes block, mounted in a box. It registers its timeline under one fixed name.
+        if (cfg.scenes.some((o, j) => j < i && o.type === "diagram" && o.hub)) throw new Error(`scene ${s.id}: a film can have one hub diagram; use a "source" picture for another`);
+        s.block = { src: null, vars: hubVariables(s), x, y: s.y ?? 250, width, height: s.height ?? 780 };
+      } else {
+        s.cards = [{ image: diagramImage(dir, s), x, y: s.y ?? 310, width, delay: 0.3, ...s.card }];
+      }
+      s.layout = "top";
+      s.type = "bullets";
+    }
     if (s.type === "clip") {
       // A scene that `demoreel record` makes needs to name no files: they are <id>.mp4 and <id>.events.json.
       s.video ??= `${scene.id ?? "clip"}.mp4`;
@@ -101,6 +116,7 @@ export function load(dir) {
       s.duration = Math.max(s.clipSeconds, s.spoken);
     } else {
       s.duration = Math.max(s.duration ?? 5, s.spoken);
+      if (s.block) s.block.src = hubBlock(dir, s, round(s.duration - 0.7));
     }
     s.start = start;
     start += s.duration;
@@ -133,8 +149,12 @@ export function textScene(dir, cfg, s, t0, opts = {}) {
     const src = image(dir, c.image, c.width, Boolean(c.zoom), cfg.scale);
     return `<div class="card" id="${id}c${k}" style="left:${c.x}px;top:${c.y}px;width:${c.width}px"><img src="${src}" /></div>`;
   }).join("");
+  // A HyperFrames block mounted in a box of its own: it plays from a little after the scene starts and ends with it.
+  const block = s.block
+    ? `<div id="${id}b" data-composition-id="constellation-hub" data-composition-src="${esc(s.block.src)}" data-variable-values="${esc(JSON.stringify(s.block.vars))}" data-start="${round(t0 + 0.3)}" data-duration="${round(s.duration - 0.7)}" data-track-index="${Number(s.n) + 100}" style="position:absolute;left:${s.block.x}px;top:${s.block.y}px;width:${s.block.width}px;height:${s.block.height}px"></div>`
+    : "";
   const html = `<div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}">
-  <div class="left">${s.kicker ? `<div class="kicker">${esc(s.kicker)}</div>` : ""}<div class="title">${esc(s.title ?? "")}</div><ul class="bullets">${bullets}</ul></div>${cards}</div>`;
+  <div class="left${s.layout === "top" ? " top" : ""}">${s.kicker ? `<div class="kicker">${esc(s.kicker)}</div>` : ""}<div class="title">${esc(s.title ?? "")}</div><ul class="bullets">${bullets}</ul></div>${cards}${block}</div>`;
 
   const js = [];
   js.push(`gsap.set("#${id}",{opacity:0});`);
@@ -253,6 +273,7 @@ export function clipScene(dir, cfg, s, t0) {
 
 // The look of a scene, shared by the film's page and the deck's slides.
 export const rules = `      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
+      .left.top { top: 80px; bottom: auto; left: 110px; width: 1700px; }
       .kicker { color: var(--accent); font-size: 26px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; }
       .title { color: var(--ink); font-size: 66px; font-weight: 700; line-height: 1.06; margin-top: 14px; letter-spacing: -1.5px; text-wrap: balance; }
       .bullets { list-style: none; margin-top: 44px; }

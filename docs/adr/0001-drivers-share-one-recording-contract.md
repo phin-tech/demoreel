@@ -15,7 +15,7 @@ and demoreel runs their commands.
 |---|---|---|---|
 | GPUI apps (Red Pen, Corkboard, Microfiche) | Typecase's driver (`typecase-drive`) | The driver draws the window itself | Yes |
 | Websites | Headless Chrome through `puppeteer-core`, already installed with HyperFrames | Page screenshots, resampled to a steady 30fps | Yes |
-| Swift apps we build | A debug socket in the app, grown from the template's `DebugDriver` | To be decided: the current snapshot draws some views blank | Probably |
+| Swift apps we build | swift-vhs: a socket in the app's Debug build, and `vhs-drive` | The window server, on the app's own window (no permission needed) | No: input needs the app in front |
 | iOS apps | The simulator: `xcrun simctl` for video, something else to tap | `simctl io recordVideo` | Mostly |
 | Other Mac apps | The Accessibility API | ScreenCaptureKit | No |
 
@@ -41,7 +41,7 @@ name, `wait:600`, `move:X,Y`), so one script can run against whichever driver fi
    process it launches (a driver that does not quit when asked is killed), keeps the driver's socket path short in a
    temporary folder, and takes the window size from the driver when the scene does not give one.
 3. The web driver, inside demoreel and behind the same `record` block.
-4. A Swift driver, built into each Swift app from the debug socket the apps already have, after a test of how well a window can be captured, since that is the unknown.
+4. A Swift driver, built into each Swift app from the debug socket the apps already have, after a test of how well a window can be captured, since that is the unknown. Done as swift-vhs (`"driver": "vhs"`); see Consequences for what the test found.
 5. Pacing a script from the words of recorded narration, which sits on top of any driver.
 
 iOS and other Mac apps wait until something needs them. The Accessibility route needs Accessibility and Screen
@@ -70,9 +70,18 @@ Recording permission and a visible window, and iOS needs a simulator set up firs
 - The events a driver writes are as fine as what it does: Typecase writes a `key` event for each typed character, so
   demoreel has to join a run of typing into one key cap or draws one per letter, which it does not yet do. The Typecase
   driver also has no scroll or drag step yet.
-- Swift capture is unproven. If a window can only be captured with the Screen Recording permission, that driver cannot
-  run hidden or unattended.
+- Swift capture: drawing a window into a bitmap the way printing does (the debug sockets' snapshot) misses materials
+  (sidebars, toolbars) and `AVPlayerLayer` video, and takes about 700 ms a frame. The window server gives an app its own
+  window without the Screen Recording permission (`CGWindowListCreateImage`, deprecated and missing from code built for
+  macOS 15, so looked up at run time) in about 12 ms, with everything in it. swift-vhs uses that, and the drawing as a
+  fallback (whose drawing-in of video frames is unverified).
+- A Swift driver can't run hidden. AppKit drops a click in a window that isn't key on most views (a table won't select a
+  row), an inactive app has no key window, and since macOS 14 an app can't bring itself forward. So `vhs-drive` brings
+  the app forward through Launch Services (`open -a`) for a script with input and gives the front back after; while it
+  runs, the keyboard goes to the app. A Swift app started from a shell rather than Launch Services counts as part of the
+  terminal and is stopped by macOS when it asks for the microphone, so a `record.command` for one goes through `open`.
 - What has been run: the Typecase driver and `demoreel record` on Typecase's `driven` example, and the web driver on a
   small local page, each hidden, end to end into a rendered clip scene, looking at still frames and not the motion.
-  The web driver has not been tried on a real site or a page served over HTTP. The Swift, iOS and Accessibility
-  drivers are designs only.
+  The web driver has not been tried on a real site or a page served over HTTP. The Swift driver (swift-vhs) has
+  recorded Booth's demo end to end with `demoreel record`, checked frame by frame and in the rendered film. The iOS
+  and Accessibility drivers are designs only.

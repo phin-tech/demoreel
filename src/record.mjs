@@ -8,6 +8,9 @@
 //               "drive": "../typecase/target/debug/typecase-drive", // the driver CLI (default: typecase-drive on the PATH)
 //               "socketEnv": "TYPECASE_DRIVER_SOCKET",            // how the app is told where to listen
 //               "env": {}, "fps": 30 }
+//
+//   "driver": "vhs" is a Mac app built with swift-vhs (github.com/phin-tech/swift-vhs) in its Debug build: the same block,
+//   with "drive" defaulting to vhs-drive and "socketEnv" to VHS_SOCKET. Its scripts are typecase-drive's lines.
 import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -29,17 +32,25 @@ export async function recordScenes(dir, only, { log = console.log } = {}) {
   return done;
 }
 
+/** The drivers that run as a CLI against a socket the app listens on, and their defaults. */
+const DRIVERS = {
+  typecase: { drive: "typecase-drive", socketEnv: "TYPECASE_DRIVER_SOCKET" },
+  vhs: { drive: "vhs-drive", socketEnv: "VHS_SOCKET" },
+};
+
 /** Runs one scene's `record` block and returns the files it wrote. */
 export async function record(dir, scene, { log = console.log } = {}) {
   const r = scene.record;
   if (r.driver === "web") return (await import("./web.mjs")).recordWeb(dir, scene, { log });
-  if ((r.driver ?? "typecase") !== "typecase") throw new Error(`scene ${scene.id}: driver "${r.driver}" is not one demoreel can run yet (typecase, web)`);
+  const kind = r.driver ?? "typecase";
+  if (!DRIVERS[kind]) throw new Error(`scene ${scene.id}: driver "${r.driver}" is not one demoreel can run yet (typecase, vhs, web)`);
   if (!r.command?.length) throw new Error(`scene ${scene.id}: record.command is the app to start`);
   if (!r.script) throw new Error(`scene ${scene.id}: record.script is the file of steps to run`);
   const fps = r.fps ?? 30;
   const script = resolve(dir, r.script);
   if (!existsSync(script)) throw new Error(`scene ${scene.id}: ${script} is missing`);
-  const drive = r.drive ? resolve(dir, r.drive) : "typecase-drive";
+  // A bare name is a command on the PATH; anything with a slash is a file, relative to the project.
+  const drive = r.drive ? (r.drive.includes("/") ? resolve(dir, r.drive) : r.drive) : DRIVERS[kind].drive;
   const cwd = resolve(dir, r.cwd ?? ".");
   const video = resolve(dir, scene.video ?? `${scene.id}.mp4`);
   const eventsFile = resolve(dir, scene.events ?? `${scene.id}.events.json`);
@@ -54,7 +65,7 @@ export async function record(dir, scene, { log = console.log } = {}) {
   const out = openSync(appLog, "a");
   const command = resolve(cwd, r.command[0]);
   const app = spawn(existsSync(command) ? command : r.command[0], r.command.slice(1), {
-    cwd, stdio: ["ignore", out, out], env: { ...process.env, ...r.env, [r.socketEnv ?? "TYPECASE_DRIVER_SOCKET"]: socket },
+    cwd, stdio: ["ignore", out, out], env: { ...process.env, ...r.env, [r.socketEnv ?? DRIVERS[kind].socketEnv]: socket },
   });
   let exited = false;
   app.on("exit", () => { exited = true; });

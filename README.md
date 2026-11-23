@@ -167,6 +167,23 @@ has probably expired; run `login` again. The file is Playwright's storage-state 
 a bare list of cookies does too. Treat it like a password: it signs in as you, and the video shows whatever your account can see.
 `--scene <id>` limits `login` to one scene.
 
+**A Mac app in Swift works the same way**, with [swift-vhs](https://github.com/phin-tech/swift-vhs) linked into its
+Debug build. `"driver": "vhs"` runs `vhs-drive` (its `just install` puts it on your PATH) and tells the app its socket in
+`VHS_SOCKET`; the script has the same lines as for Typecase's driver, and `click` takes a control's accessibility label
+(`click Edit Script`) as well as `#id` and `X,Y`:
+
+```json
+{ "type": "clip", "id": "studio",
+  "record": { "driver": "vhs", "command": ["../scripts/driven", "build/sample"], "script": "studio.script",
+              "env": { "VHS_WINDOW_SIZE": "1440x900" } } }
+```
+
+`command` must start the app through Launch Services (`open -n -W -g --env VHS_SOCKET=… -a MyApp.app`), not by running
+its binary, or macOS stops it the first time it asks for something private such as the microphone; Booth's
+`scripts/driven` does this. Frames come from the window server without the Screen Recording permission. Unlike the other
+drivers it takes focus: a Mac app only takes clicks in front, so `vhs-drive` brings it forward for the script and gives
+the front back after.
+
 **No way to record your app?** Any screen recording works. Record it with QuickTime, with the cursor hidden if you can, and
 write the events by hand: watch the video, note the frame of each click or key (frames = seconds × 30), and read the
 coordinates off a screenshot of the same window. It is fiddly the first time and quick after that.
@@ -178,6 +195,45 @@ reference for how. Encode the frames with ffmpeg:
 ```bash
 ffmpeg -framerate 30 -i frames/%05d.png -c:v libx264 -crf 14 -pix_fmt yuv420p walk.mp4
 ```
+
+### A diagram scene: how it works
+
+A `diagram` scene is a title across the top and a picture of how something works under it. There are two kinds.
+
+**A hub and its spokes**, HyperFrames' own animated block: a hub in the middle, and a line drawing out to each node.
+
+```json
+{
+  "type": "diagram",
+  "id": "how",
+  "kicker": "How it works",
+  "title": "Your forges in. Your queue out.",
+  "hub": "Red Pen",
+  "nodes": ["Your queue", "Your Pulls", "Menu bar", "Your hooks", "Your agent"],
+  "cues": [5.7, 7.0, 8.7, 9.4, 12.0],
+  "accent": "violet",
+  "narration": "Red Pen checks your forges every three minutes and keeps a local copy. From that copy come..."
+}
+```
+
+- `cues` are the seconds into the scene when each line starts to draw, so each can land as the narration says its name
+  (Booth shows when each word is spoken). Leave them out and the lines come in evenly over the first few seconds.
+- `accent` is `green`, `blue` or `violet`. `exit` is `none` (the default), `fade` or `up`.
+- Labels longer than about ten characters get clipped when there are five nodes or more; `hyperframes inspect` says so.
+- The block comes from HyperFrames' registry the first time (the network is needed once; the files stay in
+  `compositions/`). A film can have one hub diagram.
+
+**A picture** from a file, with a `source`:
+
+- `.mmd` or `.mermaid` (a Mermaid flowchart) and `.dottie` (a drawing made in [Dottie](https://dottie.phin.tech)) are
+  drawn by Dottie's `dottie` command, hand-drawn unless the scene says `"clean": true`. A `.dottie` file with several
+  pages takes `"page": "Name"` (or a number). demoreel finds `dottie` on your PATH, or at `DEMOREEL_DOTTIE`.
+- A `.png`, `.jpg` or `.webp` from any other tool (Figma, Keynote, draw.io, a screenshot) is shown as it is, and needs
+  nothing installed.
+- `width` (default 1700) and `y` (default 310) place it; it is centered across the frame. A left-to-right chart
+  (`flowchart LR`) reads larger than a wide top-down one. It comes in like a screenshot card and does not animate.
+
+Either way narration, the storyboard and the per-scene export work as for any other scene.
 
 ## 3. Add narration
 

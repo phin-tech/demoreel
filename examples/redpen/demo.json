@@ -26,6 +26,29 @@
       "audioSeconds": 10.4
     },
     {
+      "type": "diagram",
+      "id": "how",
+      "kicker": "How it works",
+      "title": "Your forges in. Your queue out.",
+      "narration": "Red Pen checks your forges every three minutes and keeps a local copy. From that copy come your Review Queue and Your Pulls, the count in the menu bar, hooks that run your own programs, and an agent that reads the same data over MCP.",
+      "hub": "Red Pen",
+      "nodes": [
+        "Your queue",
+        "Your Pulls",
+        "Menu bar",
+        "Your hooks",
+        "Your agent"
+      ],
+      "accent": "violet",
+      "cues": [
+        5.7,
+        7.0,
+        8.7,
+        9.4,
+        12.0
+      ]
+    },
+    {
       "type": "bullets",
       "id": "review",
       "duration": 5.5,
