@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { esc, round } from "./util.mjs";
 import { diagramImage, hubBlock, hubVariables } from "./diagram.mjs";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 // The stage is laid out at 1920x1080 and drawn at twice that, which is what keeps a 4K frame sharp; `scale: 1` or
@@ -55,6 +56,26 @@ export function chunks(narration = "") {
   return lines.length > 1 ? lines : sentences(lines[0] ?? "");
 }
 
+/** Speech at -16 LUFS, a usual level for a voice-over online. `"loudness"` in demo.json changes it; false leaves the
+ *  voice as recorded. */
+const DEFAULT_LOUDNESS = -16;
+
+/** A copy of a voice brought to `loudness` (LUFS), in build/voice/, made again only when the file or the level changes,
+ *  so a take recorded quietly is as loud as the next. The file itself is left alone. Returns the path to use. */
+function levelled(dir, audio, loudness) {
+  if (loudness === false || loudness === null) return audio;
+  const source = join(dir, audio);
+  const { size, mtimeMs } = statSync(source);
+  const key = createHash("sha1").update(`${audio}:${size}:${mtimeMs}:${loudness}`).digest("hex").slice(0, 10);
+  const out = `build/voice/${basename(audio, extname(audio))}-${key}.wav`;
+  if (existsSync(join(dir, out))) return out;
+  mkdirSync(join(dir, "build/voice"), { recursive: true });
+  const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", source,
+    "-af", `loudnorm=I=${loudness}:TP=-1.5:LRA=11`, "-ar", "48000", join(dir, out)], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`could not level ${audio}: ${r.stderr || r.error}`);
+  return out;
+}
+
 function probeSeconds(file) {
   const r = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8" });
   const seconds = parseFloat(r.stdout);
@@ -87,6 +108,7 @@ export function load(dir) {
     // A recorded `audio` file is measured, and that is its `audioSeconds`.
     if (s.audio) {
       if (!existsSync(join(dir, s.audio))) throw new Error(`scene ${s.id}: audio file ${s.audio} not found`);
+      s.audio = levelled(dir, s.audio, cfg.loudness ?? DEFAULT_LOUDNESS);
       s.audioSeconds = probeSeconds(join(dir, s.audio));
     }
     const words = cleanNarration(s.narration).split(/\s+/).filter(Boolean).length;

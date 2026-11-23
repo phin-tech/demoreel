@@ -267,7 +267,9 @@ is written to `audio/takes.json`, and demoreel uses it as that scene's `audio` u
 
 **Recorded or generated audio.** Put the file on the scene, `"audio": "intro.wav"` (anything ffmpeg reads), and demoreel
 measures it, sets the scene's length to fit with a short pause after, and mixes it into the video starting 0.3 seconds in
-(`"audioOffset"` changes that). No need to type `audioSeconds`. Exports also copy it into the scene's folder as `voice.*`.
+(`"audioOffset"` changes that). No need to type `audioSeconds`. Every voice is brought to -16 LUFS first (a copy in `build/voice/`; your file is left alone), so a take
+recorded quietly plays as loud as the rest; `"loudness": -14` at the top of `demo.json` changes the level, and `false`
+leaves voices as recorded. Exports also copy it into the scene's folder as `voice.*`.
 
 Keep the lines short. A long line over a still scene drags, and the fix is usually fewer words rather than a longer scene.
 
