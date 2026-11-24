@@ -1,0 +1,14 @@
+# Cooking mode: a step at a time, with a timer where a step needs one.
+wait:400
+click Lemon ricotta pancakes
+wait:1000
+click #cook
+wait:1400
+click #next
+wait:1000
+click #next
+wait:900
+click #timer
+wait:3200
+click #next
+wait:1400

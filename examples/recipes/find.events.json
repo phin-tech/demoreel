@@ -1,0 +1,55 @@
+{
+ "fps": 30,
+ "frames": 178,
+ "window": {
+  "w": 1280,
+  "h": 800
+ },
+ "events": [
+  {
+   "frame": 39,
+   "kind": "hover",
+   "x": 640,
+   "y": 420
+  },
+  {
+   "frame": 64,
+   "kind": "click",
+   "x": 426,
+   "y": 47,
+   "held": ""
+  },
+  {
+   "frame": 67,
+   "kind": "key",
+   "key": "l"
+  },
+  {
+   "frame": 69,
+   "kind": "key",
+   "key": "e"
+  },
+  {
+   "frame": 72,
+   "kind": "key",
+   "key": "m"
+  },
+  {
+   "frame": 73,
+   "kind": "key",
+   "key": "o"
+  },
+  {
+   "frame": 75,
+   "kind": "key",
+   "key": "n"
+  },
+  {
+   "frame": 114,
+   "kind": "click",
+   "x": 237.3,
+   "y": 354.9,
+   "held": ""
+  }
+ ]
+}

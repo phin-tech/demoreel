@@ -1,0 +1,9 @@
+# Search the home page and open a recipe.
+wait:900
+move:640,420
+wait:500
+click #q
+type lemon
+wait:900
+click Lemon ricotta pancakes
+wait:1600

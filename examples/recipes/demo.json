@@ -1,0 +1,48 @@
+{
+  "name": "recipes",
+  "title": "Supper, a recipe site",
+  "scenes": [
+    {
+      "type": "bullets",
+      "id": "intro",
+      "duration": 5,
+      "kicker": "Supper",
+      "title": "Recipes for tonight.",
+      "bullets": ["Find one in a few letters", "Cook for two, or for six", "A list for the shop"],
+      "narration": "Supper is a recipe site for a weeknight. Every recipe takes less than an hour."
+    },
+    {
+      "type": "clip",
+      "id": "find",
+      "record": { "driver": "web", "url": "site.html", "script": "find.script", "viewport": { "width": 1280, "height": 800 } },
+      "narration": "Type a few letters and the recipes narrow down as you go.\n\nPick one to open it."
+    },
+    {
+      "type": "clip",
+      "id": "scale",
+      "record": { "driver": "web", "url": "site.html", "script": "scale.script", "viewport": { "width": 1280, "height": 800 } },
+      "narration": "Every recipe is written for the number of people it says on the card, but when you are cooking for more people than that, or fewer, you can change the number of servings and every single quantity in the list of ingredients is worked out again for you, so you never have to do the arithmetic yourself."
+    },
+    {
+      "type": "clip",
+      "id": "cook",
+      "record": { "driver": "web", "url": "site.html", "script": "cook.script", "viewport": { "width": 1280, "height": 800 } },
+      "narration": "Start cooking, and the recipe goes one step at a time, in big type you can read from the stove.\n\nA step that needs timing has its timer right there.\n\nTwo minutes a side, and the first batch is gone. [chuckle]"
+    },
+    {
+      "type": "clip",
+      "id": "shop",
+      "record": { "driver": "web", "url": "site.html", "script": "shop.script", "viewport": { "width": 1280, "height": 800 } },
+      "narration": "Add the ingredients to your shopping list, and tick them off in the shop."
+    },
+    {
+      "type": "bullets",
+      "id": "close",
+      "duration": 4,
+      "kicker": "Supper",
+      "title": "Cook tonight, not someday.",
+      "bullets": ["Free, in your browser"],
+      "narration": "Supper. Cook tonight, not someday."
+    }
+  ]
+}

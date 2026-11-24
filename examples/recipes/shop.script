@@ -1,0 +1,12 @@
+# Put the ingredients on the shopping list and tick one off.
+wait:400
+click Lemon ricotta pancakes
+wait:1000
+click #add
+wait:1000
+click #bag
+wait:1200
+click #items li:nth-child(2) input
+wait:700
+click #items li:nth-child(4) input
+wait:1400

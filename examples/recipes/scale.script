@@ -1,0 +1,12 @@
+# Open the pancakes and cook for six instead of two.
+wait:400
+click Lemon ricotta pancakes
+wait:1200
+click #more
+wait:600
+click #more
+wait:600
+click #more
+wait:600
+click #more
+wait:1400

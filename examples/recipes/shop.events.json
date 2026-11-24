@@ -1,0 +1,45 @@
+{
+ "fps": 30,
+ "frames": 238,
+ "window": {
+  "w": 1280,
+  "h": 800
+ },
+ "events": [
+  {
+   "frame": 24,
+   "kind": "click",
+   "x": 237.3,
+   "y": 354.9,
+   "held": ""
+  },
+  {
+   "frame": 64,
+   "kind": "click",
+   "x": 914.2,
+   "y": 509.5,
+   "held": ""
+  },
+  {
+   "frame": 103,
+   "kind": "click",
+   "x": 1172.5,
+   "y": 47,
+   "held": ""
+  },
+  {
+   "frame": 148,
+   "kind": "click",
+   "x": 939,
+   "y": 152,
+   "held": ""
+  },
+  {
+   "frame": 178,
+   "kind": "click",
+   "x": 939,
+   "y": 242,
+   "held": ""
+  }
+ ]
+}
