@@ -132,9 +132,20 @@ export function load(dir) {
     }
     if (s.type === "clip") {
       // A scene that `demoreel record` makes needs to name no files: they are <id>.mp4 and <id>.events.json.
+      // A scene that names its `video` but no `events`, with no <id>.events.json beside it, is a plain video: nothing is drawn over it.
       s.video ??= `${scene.id ?? "clip"}.mp4`;
-      s.events = JSON.parse(readFileSync(join(dir, s.events ?? `${scene.id ?? "clip"}.events.json`), "utf8"));
-      s.clipSeconds = s.events.frames / (s.events.fps ?? cfg.fps);
+      const eventsFile = s.events ?? `${scene.id ?? "clip"}.events.json`;
+      const plain = scene.video !== undefined && scene.events === undefined && !existsSync(join(dir, eventsFile));
+      const recorded = plain ? null : JSON.parse(readFileSync(join(dir, eventsFile), "utf8"));
+      s.plain = plain;
+      // `from` and `to` (seconds) use only that part of the video; without `to` or events it plays to the video's end.
+      const length = s.to === undefined && !recorded ? probeSeconds(join(dir, s.video)) : undefined;
+      try {
+        s.clipSeconds = clipSeconds({ from: s.from, to: s.to, events: recorded, fps: cfg.fps, length });
+      } catch (e) {
+        throw new Error(`scene ${s.id}: ${e.message}`);
+      }
+      s.events = rangeEvents(recorded ?? { fps: cfg.fps, events: [] }, s.from ?? 0, s.clipSeconds, cfg.fps);
       s.duration = Math.max(s.clipSeconds, s.spoken);
     } else {
       s.duration = Math.max(s.duration ?? 5, s.spoken);
@@ -204,16 +215,48 @@ export function textScene(dir, cfg, s, t0, opts = {}) {
   return { html, js: js.join("\n") };
 }
 
-// A clip shorter than its narration holds its last frame, which ffmpeg makes by cloning it.
+/** How long a clip scene's video plays, in seconds: `to` - `from`, else to the end of the recording (its events'
+ *  `frames`) or of the video (`length`, measured). A `to` past the end of the recording stops at its end. */
+export function clipSeconds({ from = 0, to, events, fps = 30, length }) {
+  const end = events ? events.frames / (events.fps ?? fps) : length;
+  const stop = to === undefined ? end : end === undefined ? to : Math.min(to, end);
+  if (!(from >= 0)) throw new Error(`"from" must be 0 or more seconds, not ${from}`);
+  if (!(stop > from)) throw new Error(`the clip ends (${round(stop)}s) before it starts ("from": ${from})`);
+  return round(stop - from);
+}
+
+/** A recording's events as seen from `from` seconds in, for `seconds`: those outside the range are dropped and the
+ *  rest are renumbered so frame 0 is `from`. */
+export function rangeEvents(recorded, from, seconds, fps = 30) {
+  const rate = recorded.fps ?? fps;
+  const first = Math.round(from * rate);
+  const frames = Math.round(seconds * rate);
+  const events = (recorded.events ?? [])
+    .map((e) => ({ ...e, frame: e.frame - first }))
+    .filter((e) => e.frame >= 0 && e.frame < frames);
+  return { ...recorded, fps: rate, frames, events };
+}
+
+// The part of the video a clip scene plays (`from` to `to`) is cut out by ffmpeg, and a clip shorter than its
+// narration holds its last frame, which ffmpeg makes by cloning it. The copy goes in build/, named for both.
 function heldClip(dir, s) {
-  if (s.duration <= s.clipSeconds + 0.05) return s.video;
-  const out = join("build", `${basename(s.video, extname(s.video))}-held-${Math.round(s.duration * 10)}.mp4`);
-  const from = join(dir, s.video);
+  const from = s.from ?? 0;
+  const trim = from > 0 || s.to !== undefined;
+  const hold = s.duration > s.clipSeconds + 0.05;
+  if (!trim && !hold) return s.video;
+  const tag = [trim && `${round(from)}-${round(from + s.clipSeconds)}`, hold && `held-${Math.round(s.duration * 10)}`].filter(Boolean).join("-");
+  const out = join("build", `${basename(s.video, extname(s.video))}-${tag}.mp4`);
+  const source = join(dir, s.video);
   const to = join(dir, out);
   mkdirSync(join(dir, "build"), { recursive: true });
-  if (!existsSync(to) || statSync(to).mtimeMs < statSync(from).mtimeMs) {
-    const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", from, "-vf", `tpad=stop_mode=clone:stop_duration=${round(s.duration - s.clipSeconds)}`, "-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p", to]);
-    if (r.status !== 0) throw new Error(`ffmpeg could not hold the last frame of ${s.video}: ${r.stderr}`);
+  if (!existsSync(to) || statSync(to).mtimeMs < statSync(source).mtimeMs) {
+    const args = ["-y", "-loglevel", "error"];
+    if (trim) args.push("-ss", String(round(from)), "-t", String(s.clipSeconds));
+    args.push("-i", source);
+    if (hold) args.push("-vf", `tpad=stop_mode=clone:stop_duration=${round(s.duration - s.clipSeconds)}`);
+    args.push("-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p", to);
+    const r = spawnSync("ffmpeg", args);
+    if (r.status !== 0) throw new Error(`ffmpeg could not ${trim ? "cut" : "hold the last frame of"} ${s.video}: ${r.stderr}`);
   }
   return out;
 }
@@ -221,9 +264,13 @@ function heldClip(dir, s) {
 export function clipScene(dir, cfg, s, t0) {
   const id = `s${s.n}`;
   const win = s.window ?? s.events.window ?? { w: 1280, h: 801 };
-  const card = { x: 180, y: 70, width: 1560, ...s.card };
+  // `layout: "full"` fills the frame with the video, letterboxed, and draws key caps over it but no pointer or clicks.
+  // A plain video (no events) has no pointer either.
+  const full = s.layout === "full";
+  const pointer = !full && !s.plain;
+  const card = full ? { x: 0, y: 0, width: cfg.width } : { x: 180, y: 70, width: 1560, ...s.card };
   const k = card.width / win.w;
-  const height = round(win.h * k);
+  const height = full ? cfg.height : round(win.h * k);
   const fps = s.events.fps ?? cfg.fps;
   const at = (p) => ({ x: round(card.x + p.x * k), y: round(card.y + p.y * k) });
   const GLIDE = 14 / fps;
@@ -235,7 +282,7 @@ export function clipScene(dir, cfg, s, t0) {
   js.push(`gsap.set("#${id}, #${id}v",{opacity:0});`);
   js.push(`tl.to("#${id}, #${id}v",{opacity:1,duration:.4},${round(t0)});`);
   js.push(`tl.to("#${id}, #${id}v",{opacity:0,duration:.4},${round(t0 + s.duration - 0.4)});`);
-  js.push(`gsap.set("#${id}cursor",{x:${start.x},y:${start.y}});`);
+  if (pointer) js.push(`gsap.set("#${id}cursor",{x:${start.x},y:${start.y}});`);
   const events = s.events.events;
   const gap = s.typingGap ?? TYPING_GAP_FRAMES;
   const isChar = (e) => e.kind === "key" && (e.key.length === 1 || e.key === "space");
@@ -266,11 +313,13 @@ export function clipScene(dir, cfg, s, t0) {
       js.push(`tl.to("#${id}k${i}",{opacity:1,y:0,duration:.2,ease:"power2.out"},${round(t)});tl.to("#${id}k${i}",{opacity:0,duration:.27},${round(t0 + run.at(-1).frame / fps + 0.93)});`);
       return;
     }
-    if (e.x !== undefined) {
+    if (full) {
+      // Only keys are drawn over a full-frame video.
+    } else if (e.x !== undefined) {
       const to = at(e);
       js.push(`tl.to("#${id}cursor",{x:${to.x},y:${to.y},duration:${round(GLIDE)},ease:"power2.inOut"},${round(Math.max(t0, t - GLIDE))});`);
     }
-    if (e.kind === "click") {
+    if (e.kind === "click" && !full) {
       const to = at(e);
       rings += `<div class="ring" id="${id}r${i}"></div>`;
       js.push(`gsap.set("#${id}r${i}",{x:${to.x},y:${to.y},scale:.17,opacity:0});`);
@@ -286,9 +335,10 @@ export function clipScene(dir, cfg, s, t0) {
   });
 
   // The video is not inside the timed scene div, which would leave the renderer unable to find it, and has an id.
-  const html = `<video id="${id}v" class="clip clipvideo" src="${heldClip(dir, s)}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
+  const cursor = !pointer ? "" : `<div class="cursor" id="${id}cursor"><svg width="34" height="40" viewBox="0 0 17 20"><path d="M1 1 L1 15.5 L5 12 L7.8 18.2 L10.2 17.1 L7.5 11 L13 11 Z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg></div>`;
+  const html = `<video id="${id}v" class="clip clipvideo${full ? " full" : ""}" src="${heldClip(dir, s)}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
 <div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}">
-  ${rings}<div class="cursor" id="${id}cursor"><svg width="34" height="40" viewBox="0 0 17 20"><path d="M1 1 L1 15.5 L5 12 L7.8 18.2 L10.2 17.1 L7.5 11 L13 11 Z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg></div>
+  ${rings}${cursor}
   <div class="keys">${keys}</div></div>`;
   return { html, js: js.join("\n") };
 }
@@ -305,6 +355,7 @@ export const rules = `      .left { position: absolute; left: 110px; top: 0; bot
       .card { position: absolute; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
       .card img, .card video { width: 100%; display: block; }
       .clipvideo { position: absolute; object-fit: cover; border-radius: 18px; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
+      .clipvideo.full { object-fit: contain; border-radius: 0; box-shadow: none; background: #000; }
       .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
       .ring { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
         border: 4px solid var(--accent); background: rgba(232,165,58,.18); }
