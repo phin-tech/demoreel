@@ -466,7 +466,11 @@ can be rendered in other colours without changing `demo.json`:
 Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `link`, `linkLabel`, `zoom` (`to`, `origin`, `at`, `duration`).
 
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
-fractions of the window where it starts; default 0.55, 0.6), `chapter`, `theme`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
+fractions of the window where it starts; default 0.55, 0.6), `from`, `to`, `layout`, `chapter`, `theme`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
+`from` and `to` are seconds into `video`: the scene plays only that part, and its events are counted from `from`. Without
+`to` it plays to the end. Several scenes can take parts of one video this way. `events` can be left out when the scene
+names its `video` and there is no `<id>.events.json`: the video plays with nothing drawn over it. `"layout": "full"` fills
+the frame with the video, whole and letterboxed, with no card around it, and draws key caps but no pointer or clicks.
 
 Commands: `demoreel build` writes the HTML only; `lint`; `check`; `snapshot` (`--at`); `render` (the whole film to
 `out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`. `render` and `export` take `--draft`,
