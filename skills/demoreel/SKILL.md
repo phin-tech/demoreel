@@ -23,7 +23,8 @@ installing this skill does not install the tool.
    driver, put a `record` block on the clip scene and run `demoreel record <folder>`, which does all of this; `"driver": "web"`
    does the same for a website.
 3. **Write `demo.json`.** `bullets` scenes (title, bullets, floating `cards`, optional `zoom`) and `clip` scenes (a video and
-   its events). Put the narration in each scene.
+   its events). Put the narration in each scene, or in `script.md` (a `## <scene id>` heading per scene, a paragraph per
+   chunk), which is then the narration and `demo.json`'s is not used.
 4. **Check, then render.** `demoreel check <folder>` (lint, then the film played in a browser for layout, contrast and
    audio), then look at frames before calling it done: `demoreel snapshot <folder>` saves a still from each scene in
    `out/snapshots/` without rendering (`--at 3,7.5` for given seconds); read them. A passing check does not show how it

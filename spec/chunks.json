@@ -1,0 +1,77 @@
+{
+ "about": "A narration's chunks: the pieces it is recorded, retaken and timed in. Its sentences, for the cases with `sentences`.",
+ "chunks": [
+  {
+   "why": "with no line break, a chunk is a sentence",
+   "narration": "Open the changes. Leave notes in ink! Want a tour? Yes.",
+   "chunks": [
+    "Open the changes.",
+    "Leave notes in ink!",
+    "Want a tour?",
+    "Yes."
+   ]
+  },
+  {
+   "why": "a line break ends a chunk, which can hold several sentences",
+   "narration": "Open the changes. Read them properly.\nLeave notes in ink.\n\nSee a diagram. Then ship.",
+   "chunks": [
+    "Open the changes. Read them properly.",
+    "Leave notes in ink.",
+    "See a diagram. Then ship."
+   ]
+  },
+  {
+   "why": "a Windows line break is a line break",
+   "narration": "One.\r\nTwo.",
+   "chunks": [
+    "One.",
+    "Two."
+   ]
+  },
+  {
+   "why": "audio tags are not part of a chunk, and a line of nothing but tags is not a chunk",
+   "narration": "[enthusiasm] Red Pen is local, [natural pace] fast and private.\n[pause]\n[bold] Review faster.",
+   "chunks": [
+    "Red Pen is local, fast and private.",
+    "Review faster."
+   ]
+  },
+  {
+   "why": "one line with a trailing break is still split by sentence",
+   "narration": "One. Two.\n",
+   "chunks": [
+    "One.",
+    "Two."
+   ]
+  },
+  {
+   "why": "no narration has no chunks",
+   "narration": "",
+   "chunks": []
+  },
+  {
+   "why": "nothing but a tag has no chunks",
+   "narration": "[pause]",
+   "chunks": []
+  }
+ ],
+ "sentences": [
+  {
+   "why": "a full stop inside a word does not end a sentence",
+   "text": "Version 1.2 is out. Try it.",
+   "sentences": [
+    "Version 1.2 is out.",
+    "Try it."
+   ]
+  },
+  {
+   "why": "a run of marks ends a sentence once, at the last",
+   "text": "Wait... what?! Fine.",
+   "sentences": [
+    "Wait...",
+    "what?!",
+    "Fine."
+   ]
+  }
+ ]
+}

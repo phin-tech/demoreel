@@ -247,6 +247,29 @@ Put the words on each scene:
 Text in square brackets is for a voice engine that understands audio tags; the captions and the plain-text narration have
 them stripped. Not every engine reads them, so test one line first.
 
+**Or keep the narration in `script.md`,** beside `demo.json`, to write and edit it as prose in any editor. When a project
+has one, it is the narration and each scene's `narration` in `demo.json` is not used:
+
+```markdown
+# My demo
+
+## intro · 01 · 0:00 – 0:07
+
+[enthusiasm] My App puts everything in one place.
+It keeps up with you.
+
+Here is how it works.
+```
+
+The first word after `##` is the scene's `id` in `demo.json` (for two scenes with the same name, its number too, like
+`03-bullets`); the rest of that line is only for reading. Each paragraph is a chunk, recorded and timed on its own: a blank
+line starts the next, and lines without one between them are one chunk however they wrap. `<!-- comments -->` are left
+out. A heading can end with an anchor, `{#k7qx}`: the scene's `ref` in `demo.json`, which finds the scene even after it is
+renamed or renumbered (Booth adds them). A heading that matches no scene is reported. The exact rules, with cases that
+demoreel's and Booth's tests both run, are in [spec/](spec/README.md). [Booth](https://github.com/phin-tech/booth) writes it for you (File ›
+Keep Narration in script.md, or by itself after a rough take with no script) and keeps it in step when it cuts or joins
+scenes.
+
 **Chunks.** A narration is recorded, retaken and timed in chunks: a line break (`\n` in the JSON string) ends one, so you
 choose where they fall, and a chunk can be several sentences. A narration with no line break has a chunk for each
 sentence. The line breaks change nothing in the voice or the captions, which read the text as one run.

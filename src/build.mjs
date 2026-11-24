@@ -7,6 +7,7 @@ import { esc, round } from "./util.mjs";
 import { diagramImage, hubBlock, hubVariables } from "./diagram.mjs";
 import { createHash } from "node:crypto";
 import { GSAP } from "./hyperframes.mjs";
+import { scriptNarration } from "./script.mjs";
 
 // The page is laid out at 1920x1080 and HyperFrames draws it at twice that (Chrome's device scale, not a CSS zoom), so a
 // 4K frame is sharp; `scale: 1` or DEMOREEL_SCALE=1 (the CLI's --hd) draws it at 1080p.
@@ -77,8 +78,7 @@ export function sentences(text = "") {
 /**
  * The chunks of a narration: the pieces it is recorded, retaken and timed in. A line break ends a chunk, so a person says
  * where they fall, and a chunk can be several sentences. A narration with no line break has a chunk for each sentence.
- * [Audio tags] are stripped, as for the captions. Booth splits the same way, so keep the two in step (test/chunks.test.mjs
- * and Booth's tests share their examples).
+ * [Audio tags] are stripped, as for the captions. Booth splits the same way: the rule and its cases are in spec/.
  */
 export function chunks(narration = "") {
   const lines = String(narration).split(/\r?\n/).map(cleanNarration).filter(Boolean);
@@ -133,9 +133,13 @@ export function load(dir) {
   const takesFile = join(dir, "audio/takes.json");
   const takes = existsSync(takesFile) ? JSON.parse(readFileSync(takesFile, "utf8")) : {};
   let start = 0;
+  // The narration is script.md's when the project has one (see script.mjs), else each scene's own.
+  const script = scriptNarration(dir, cfg.scenes);
+  if (script?.unknown.length) console.warn(`script.md: no scene is called ${script.unknown.join(", ")}, so that narration isn't used`);
   cfg.scenes = cfg.scenes.map((scene, i) => {
     const n = String(i + 1).padStart(2, "0");
     const s = { ...scene, n, id: `${n}-${scene.id ?? scene.type}` };
+    if (script) s.narration = script.byScene[i] ?? "";
     if (s.theme) checkTheme(s.theme, `scene ${s.id}`);
     // A scene lasts as long as its narration takes to say (its `audioSeconds` if measured, else `wordsPerMinute`) and a short pause, if that is longer
     // than the scene's own `duration` (a clip's is the clip's length), so the voice is never cut off.

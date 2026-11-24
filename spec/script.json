@@ -1,0 +1,160 @@
+{
+ "about": "script.md: the scenes' keys, its sections, and each scene's narration found in it.",
+ "keys": [
+  {
+   "why": "a scene is called by its name unless another scene has that name",
+   "names": [
+    "intro",
+    "clip",
+    "clip",
+    "close"
+   ],
+   "keys": [
+    "intro",
+    "02-clip",
+    "03-clip",
+    "close"
+   ]
+  }
+ ],
+ "parse": [
+  {
+   "why": "lines without a blank line between them are one chunk however they wrap",
+   "markdown": "## open · 0:00\n\nSo this is the queue.\nIt shows what needs you first,\n  and what can wait.\n\nNext.\n## diff\nOpen a change.\n",
+   "sections": [
+    {
+     "key": "open",
+     "chunks": [
+      "So this is the queue. It shows what needs you first, and what can wait.",
+      "Next."
+     ],
+     "ref": null
+    },
+    {
+     "key": "diff",
+     "chunks": [
+      "Open a change."
+     ],
+     "ref": null
+    }
+   ]
+  },
+  {
+   "why": "a heading inside a comment is not a scene, and comments are not narration",
+   "markdown": "<!--\n## not-a-scene\n-->\n## open\n\nHi.\n<!-- aside -->\nThere.\n",
+   "sections": [
+    {
+     "key": "open",
+     "chunks": [
+      "Hi. There."
+     ],
+     "ref": null
+    }
+   ]
+  },
+  {
+   "why": "the first word after ## is the key, whatever follows it",
+   "markdown": "# Title\n\n## diff — the review part\n\nOpen a change.\n",
+   "sections": [
+    {
+     "key": "diff",
+     "chunks": [
+      "Open a change."
+     ],
+     "ref": null
+    }
+   ]
+  },
+  {
+   "why": "an anchor at the end of a heading, {#ref}, is the scene's ref, and not part of its key",
+   "markdown": "## intro · 01 · 0:00 – 0:07 {#k7qx}\n\nHello.\n## close{#a1b2}\nBye.\n",
+   "sections": [
+    {
+     "key": "intro",
+     "chunks": [
+      "Hello."
+     ],
+     "ref": "k7qx"
+    },
+    {
+     "key": "close",
+     "chunks": [
+      "Bye."
+     ],
+     "ref": "a1b2"
+    }
+   ]
+  }
+ ],
+ "narrations": [
+  {
+   "why": "narration is found by name or by number and name, and a heading for no scene is reported",
+   "markdown": "# T\n<!-- a\nnote -->\n## intro · 0:00\n\nHello.\n\nAgain.\n## 03-clip\nThird.\n## gone\nLost.\n",
+   "names": [
+    "intro",
+    "clip",
+    "clip"
+   ],
+   "byScene": [
+    "Hello.\nAgain.",
+    null,
+    "Third."
+   ],
+   "unknown": [
+    "gone"
+   ],
+   "refs": [
+    null,
+    null,
+    null
+   ]
+  },
+  {
+   "why": "a heading with an anchor finds the scene with that ref, whatever the scene is called now",
+   "markdown": "## old-name {#k7qx}\n\nHi.\n",
+   "names": [
+    "new-name"
+   ],
+   "refs": [
+    "k7qx"
+   ],
+   "byScene": [
+    "Hi."
+   ],
+   "unknown": []
+  },
+  {
+   "why": "anchors tell apart scenes with the same name, even when the numbers on the headings are out of date",
+   "markdown": "## 03-clip {#bbbb}\nSecond.\n## 02-clip {#aaaa}\nFirst.\n",
+   "names": [
+    "clip",
+    "clip"
+   ],
+   "refs": [
+    "aaaa",
+    "bbbb"
+   ],
+   "byScene": [
+    "First.",
+    "Second."
+   ],
+   "unknown": []
+  },
+  {
+   "why": "an anchor no scene has falls back to the key, and a heading that finds no scene either way is reported by its key",
+   "markdown": "## intro {#zzzz}\nHello.\n## gone {#yyyy}\nLost.\n",
+   "names": [
+    "intro"
+   ],
+   "refs": [
+    "k7qx"
+   ],
+   "byScene": [
+    "Hello."
+   ],
+   "unknown": [
+    "gone"
+   ]
+  }
+ ]
+}

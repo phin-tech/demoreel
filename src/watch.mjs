@@ -1,7 +1,7 @@
 // `demoreel watch`: export again whenever what the film is made from changes, so Booth (which reloads when the export
 // lands) shows the scenes at their new lengths a few seconds after a take is ticked.
 //
-// It reacts to demo.json, Booth's audio/takes.json, and the files they name (the takes in use, clips and their events,
+// It reacts to demo.json, script.md, Booth's audio/takes.json, and the files they name (the takes in use, clips and their events,
 // screenshots, diagram sources), and to nothing else: not demoreel's own output, and not a take still being recorded.
 import { watch as watchFiles, readFileSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
@@ -14,7 +14,7 @@ const strings = (v) => (typeof v === "string" ? [v] : Array.isArray(v) ? v.flatM
 
 /** Whether a change to `rel` (a path in the project, with /) changes the film. */
 export function matters(dir, rel) {
-  if (rel === "demo.json" || rel === "audio/takes.json") return true;
+  if (rel === "demo.json" || rel === "script.md" || rel === "audio/takes.json") return true;
   if (/^(out|build|deck|node_modules|compositions|\.hyperframes)\//.test(rel) || rel.endsWith(".marks.json")) return false;
   const read = (file) => {
     try {
