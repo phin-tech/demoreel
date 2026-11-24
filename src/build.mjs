@@ -8,6 +8,7 @@ import { diagramImage, hubBlock, hubVariables } from "./diagram.mjs";
 import { createHash } from "node:crypto";
 import { GSAP } from "./hyperframes.mjs";
 import { scriptNarration } from "./script.mjs";
+import { transcribe, align, cues as captionCues } from "./captions.mjs";
 
 // The page is laid out at 1920x1080 and HyperFrames draws it at twice that (Chrome's device scale, not a CSS zoom), so a
 // 4K frame is sharp; `scale: 1` or DEMOREEL_SCALE=1 (the CLI's --hd) draws it at 1080p.
@@ -480,6 +481,34 @@ export const rules = `      .scene { font-family: var(--font); }
 `;
 
 // The page is the film at its layout size; HyperFrames draws it at `scale` when it renders (see resolutionArgs).
+/** Each scene's captions, from what its recorded audio says: on the scene, or a warning and none. */
+export function addCaptions(dir, cfg) {
+  for (const s of cfg.scenes) {
+    if (!s.audio || !s.narration || s.captions) continue;
+    try {
+      s.captions = captionCues(align(s.narration, transcribe(dir, s)));
+    } catch (e) {
+      console.warn(`scene ${s.id}: no captions: ${e.message}`);
+    }
+  }
+}
+
+/** Captions drawn into the film (`"captions": "burn"`), timed as in captions.vtt: a line at a time, low in the frame. */
+export function burnedCaptions(cfg, scenes, at = (s) => s.start) {
+  let html = "";
+  const js = [];
+  scenes.forEach((s) => {
+    const base = at(s) + (s.audioOffset ?? DEFAULT_AUDIO_OFFSET);
+    (s.captions ?? []).forEach((c, k) => {
+      const id = `cc${s.n}x${k}`;
+      html += `<div class="caption" id="${id}"><span>${esc(c.text)}</span></div>`;
+      js.push(`gsap.set("#${id}",{opacity:0});tl.to("#${id}",{opacity:1,duration:.12},${round(base + c.start)});tl.to("#${id}",{opacity:0,duration:.12},${round(Math.max(base + c.start + 0.12, base + c.end - 0.12))});`);
+    });
+  });
+  if (!html) return null;
+  return { html: `<div class="captions">${html}</div>`, js: js.join("\n") };
+}
+
 function page(cfg, parts, total, audio = "") {
   const W = cfg.width;
   const H = cfg.height;
@@ -496,7 +525,7 @@ function page(cfg, parts, total, audio = "") {
       html, body { width: ${W}px; height: ${H}px; overflow: hidden; background: #0e0e11; }
       #stage { position: absolute; left: 0; top: 0; width: ${W}px; height: ${H}px; font-family: var(--font); background: var(--background); overflow: hidden; }
       #stage .scene.clip { position: absolute; left: 0; top: 0; right: auto; bottom: auto; width: ${W}px; height: ${H}px; }
-${rules}
+${rules}${cfg.captions === "burn" ? captionRules : ""}
     </style>
   </head>
   <body>
@@ -518,6 +547,15 @@ ${parts.map((p) => p.js).join("\n")}
 `;
 }
 
+// Burned captions sit low and centred, over everything, and key caps move up out of their way.
+const captionRules = `
+      .captions { position: absolute; left: 0; right: 0; bottom: 0; height: 0; z-index: 50; }
+      .caption { position: absolute; left: 160px; right: 160px; bottom: 44px; text-align: center; }
+      .caption span { display: inline-block; padding: 10px 26px; border-radius: 14px; font-family: var(--font); font-size: 44px; font-weight: 600;
+        line-height: 1.25; color: var(--ink); background: rgba(10,10,12,.9); text-wrap: balance; }
+      .keys { bottom: 150px; }
+`;
+
 export const removeScenePages = (dir, cfg) => cfg.scenes.forEach((s) => rmSync(join(dir, `scene-${s.n}.html`), { force: true }));
 
 const make = (dir, cfg, s, t0) => (s.type === "clip" ? clipScene(dir, cfg, s, t0) : textScene(dir, cfg, s, t0));
@@ -528,10 +566,17 @@ export function build(dir, { scenes = false } = {}) {
   const cfg = load(dir);
   mkdirSync(join(dir, "build"), { recursive: true });
   copyFileSync(GSAP, join(dir, "build/gsap.min.js"));
-  writeFileSync(join(dir, "index.html"), page(cfg, cfg.scenes.map((s) => make(dir, cfg, s, s.start)), cfg.total, cfg.scenes.map((s) => audioTag(s, s.start)).filter(Boolean).join("\n")));
+  // Burned-in captions need the words' times before the page is written, so the audio is transcribed now.
+  const burn = cfg.captions === "burn";
+  if (burn) addCaptions(dir, cfg);
+  const withCaptions = (parts, scenes, at) => {
+    const c = burn && burnedCaptions(cfg, scenes, at);
+    return c ? [...parts, c] : parts;
+  };
+  writeFileSync(join(dir, "index.html"), page(cfg, withCaptions(cfg.scenes.map((s) => make(dir, cfg, s, s.start)), cfg.scenes), cfg.total, cfg.scenes.map((s) => audioTag(s, s.start)).filter(Boolean).join("\n")));
   if (!scenes) removeScenePages(dir, cfg);
   if (scenes) {
-    for (const s of cfg.scenes) writeFileSync(join(dir, `scene-${s.n}.html`), page(cfg, [make(dir, cfg, s, 0)], s.duration, audioTag(s, 0)));
+    for (const s of cfg.scenes) writeFileSync(join(dir, `scene-${s.n}.html`), page(cfg, withCaptions([make(dir, cfg, s, 0)], [s], () => 0), s.duration, audioTag(s, 0)));
   }
   return cfg;
 }

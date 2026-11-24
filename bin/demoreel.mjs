@@ -9,8 +9,7 @@ import { fileURLToPath } from "node:url";
 import { buildDeck } from "../src/deck.mjs";
 import { writeTimeline } from "../src/timeline.mjs";
 import { loginScenes, recordScenes } from "../src/record.mjs";
-import { transcribe, align, cues as captionCues } from "../src/captions.mjs";
-import { build, removeScenePages, resolutionArgs, writeStoryboard, writeVids } from "../src/build.mjs";
+import { addCaptions, build, removeScenePages, resolutionArgs, writeStoryboard, writeVids } from "../src/build.mjs";
 
 const [command, ...rest] = process.argv.slice(2);
 if (process.argv.includes("--hd")) process.env.DEMOREEL_SCALE = "1";
@@ -186,15 +185,8 @@ if (command === "export") {
     }
     writeFileSync(join(out, "chapters.txt"), youtubeChapters(cfg));
   }
-  // Captions for each scene that has recorded audio, timed from what was said.
-  for (const s of cfg.scenes) {
-    if (!s.audio || !s.narration) continue;
-    try {
-      s.captions = captionCues(align(s.narration, transcribe(dir, s)));
-    } catch (e) {
-      console.warn(`scene ${s.id}: no captions: ${e.message}`);
-    }
-  }
+  // Captions for each scene that has recorded audio, timed from what was said (already there if they were burned in).
+  addCaptions(dir, cfg);
   writeStoryboard(dir, cfg, out, perScene ? {} : { film: `${name}.mp4` });
   if (perScene) {
     writeVids(cfg, out);

@@ -476,6 +476,10 @@ scene plays: a long wait for a render, say. The video cuts across each one, the 
 clip's corner says how much was left out ("⏩ 28s later"); the cut is a `skip` cue too, so the narration can talk over
 it.
 
+`"captions": "burn"` at the top of `demo.json` draws the captions into the film, low in the frame, for a video that
+plays muted (a store page, a feed). They are the same captions as `captions.vtt`, from each scene's recorded audio, so
+`build` transcribes the audio first (Parakeet, cached in `build/`); key caps move up out of their way.
+
 Commands: `demoreel build` writes the HTML only; `lint`; `check`; `snapshot` (`--at`); `render` (the whole film to
 `out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`. `render` and `export` take `--draft`,
 `--hd` and `--variables`, and `export` takes `--scenes`.
