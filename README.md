@@ -491,7 +491,8 @@ place in the clip as trimmed, until its stretch ends, levelled 3 dB under the na
 plays muted (a store page, a feed). They are the same captions as `captions.vtt`, from each scene's recorded audio, so
 `build` transcribes the audio first (Parakeet, cached in `build/`); key caps move up out of their way.
 
-Commands: `demoreel build` writes the HTML only; `lint`; `check`; `snapshot` (`--at`); `render` (the whole film to
+Commands: `demoreel build` writes the HTML only; `lint`; `check`; `snapshot` (`--at`); `review` (out/review.md: words each
+voice didn't say as written, and long stretches with nothing said, with two stills a scene); `render` (the whole film to
 `out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`. `render` and `export` take `--draft`,
 `--hd` and `--variables`, and `export` takes `--scenes`.
 

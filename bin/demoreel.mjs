@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { buildDeck } from "../src/deck.mjs";
 import { writeTimeline } from "../src/timeline.mjs";
 import { loginScenes, recordScenes } from "../src/record.mjs";
+import { writeReview } from "../src/review.mjs";
 import { addCaptions, build, removeScenePages, resolutionArgs, writeStoryboard, writeVids } from "../src/build.mjs";
 
 const [command, ...rest] = process.argv.slice(2);
@@ -29,6 +30,8 @@ const usage = `demoreel <command> [project-folder]
   check    build, then lint and play the film in a browser: layout, contrast, motion and audio problems
   snapshot build, then save stills to out/snapshots/ without rendering: a frame from each scene, or the
            seconds given with --at 2,7.5
+  review   build, then out/review.md (for each scene: words its voice didn't say as written, and long stretches with
+           nothing said) and two stills a scene in out/snapshots/
   render   build, then render the whole film to out/<name>.mp4
   record   run each clip scene's \`record\` block: launch the app hidden, run its script through the driver, and write
            the scene's video and events (needs the app and typecase-drive; see docs/adr/0001-*.md)
@@ -57,7 +60,7 @@ function hf(args) {
   if (r.status !== 0) process.exit(r.status ?? 1);
 }
 
-if (!["build", "lint", "check", "snapshot", "render", "export", "watch", "timeline", "record", "login", "deck", "present"].includes(command)) {
+if (!["build", "lint", "check", "snapshot", "review", "render", "export", "watch", "timeline", "record", "login", "deck", "present"].includes(command)) {
   console.log(usage);
   process.exit(command ? 1 : 0);
 }
@@ -156,6 +159,13 @@ if (command === "snapshot") {
   // Without times, a still from the middle of each scene.
   const times = at ?? cfg.scenes.map((s) => Math.round((s.start + s.duration / 2) * 100) / 100).join(",");
   hf(["snapshot", ".", "--at", times, "--no-end", "-o", "out/snapshots"]);
+}
+if (command === "review") {
+  mkdirSync(join(dir, "out"), { recursive: true });
+  const flagged = writeReview(dir, cfg);
+  const times = cfg.scenes.flatMap((s) => [s.start + 0.4 * s.duration, s.start + 0.85 * s.duration]).map((t) => Math.round(t * 100) / 100).join(",");
+  hf(["snapshot", ".", "--at", times, "--no-end", "-o", "out/snapshots"]);
+  console.log(`wrote out/review.md (${flagged} thing${flagged === 1 ? "" : "s"} to look at) and two stills a scene in out/snapshots/`);
 }
 if (command === "render") {
   mkdirSync(join(dir, "out"), { recursive: true });
