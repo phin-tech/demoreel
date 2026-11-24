@@ -471,6 +471,10 @@ fractions of the window where it starts; default 0.55, 0.6), `from`, `to`, `layo
 `to` it plays to the end. Several scenes can take parts of one video this way. `events` can be left out when the scene
 names its `video` and there is no `<id>.events.json`: the video plays with nothing drawn over it. `"layout": "full"` fills
 the frame with the video, whole and letterboxed, with no card around it, and draws key caps but no pointer or clicks.
+`skip` is a list of `{ "from", "to" }` stretches (seconds into `video`, like `from` and `to`) to leave out of the part the
+scene plays: a long wait for a render, say. The video cuts across each one, the events after it move up, and a tag in the
+clip's corner says how much was left out ("⏩ 28s later"); the cut is a `skip` cue too, so the narration can talk over
+it.
 
 Commands: `demoreel build` writes the HTML only; `lint`; `check`; `snapshot` (`--at`); `render` (the whole film to
 `out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`. `render` and `export` take `--draft`,

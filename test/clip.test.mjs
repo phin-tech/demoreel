@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clipSeconds, rangeEvents, cues } from "../src/build.mjs";
+import { clipSeconds, rangeEvents, keptRanges, keptEvents, skipLabel, cues } from "../src/build.mjs";
 
 const recorded = {
   fps: 30, frames: 300, window: { w: 1440, h: 900 },
@@ -47,4 +47,34 @@ test("a clip with no events has no cues", () => {
 test("cues of a ranged clip are timed from its own start", () => {
   const s = { type: "clip", events: rangeEvents(recorded, 2, 4, 30) };
   assert.deepEqual(cues(s), [{ t: 1, label: "click" }, { t: 3, label: "key cmd-k" }]);
+});
+
+test("a skip takes its stretch out of the clip", () => {
+  assert.deepEqual(keptRanges(0, 10, [{ from: 4, to: 7 }]), [[0, 4], [7, 10]]);
+  assert.deepEqual(keptRanges(1, 10, [{ from: 8, to: 9 }, { from: 2, to: 3 }]), [[1, 2], [3, 8], [9, 10]], "in any order");
+  assert.deepEqual(keptRanges(2, 6), [[2, 6]]);
+});
+
+test("a skip outside the clip, back to front, or overlapping another is an error", () => {
+  assert.throws(() => keptRanges(0, 10, [{ from: 5, to: 4 }]), /before it starts/);
+  assert.throws(() => keptRanges(3, 10, [{ from: 2, to: 5 }]), /not inside/);
+  assert.throws(() => keptRanges(0, 10, [{ from: 6, to: 12 }]), /not inside/);
+  assert.throws(() => keptRanges(0, 10, [{ from: 2, to: 5 }, { from: 4, to: 6 }]), /overlaps/);
+});
+
+test("events in a skipped stretch are dropped, later ones move up, and the cut is marked", () => {
+  // frames 10, 90, 150, 240 at 30fps = 0.33s, 3s, 5s, 8s; skip 2s–6s.
+  const r = keptEvents(recorded, keptRanges(0, 10, [{ from: 2, to: 6 }]), 30);
+  assert.equal(r.frames, 180);
+  assert.deepEqual(r.events, [
+    { frame: 10, kind: "key", key: "j" },
+    { frame: 60, kind: "skip", seconds: 4 },
+    { frame: 120, kind: "click", x: 1, y: 2 },
+  ]);
+});
+
+test("a skip is a cue, saying how much was left out", () => {
+  const s = { type: "clip", events: keptEvents(recorded, [[0, 2], [80, 90]], 30) };
+  assert.deepEqual(cues(s).find((c) => c.label.startsWith("skip")), { t: 2, label: "skip 1m 18s" });
+  assert.equal(skipLabel(28.4), "28s");
 });

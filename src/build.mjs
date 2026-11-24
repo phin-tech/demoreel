@@ -183,11 +183,14 @@ export function load(dir) {
       // `from` and `to` (seconds) use only that part of the video; without `to` or events it plays to the video's end.
       const length = s.to === undefined && !recorded ? probeSeconds(join(dir, s.video)) : undefined;
       try {
-        s.clipSeconds = clipSeconds({ from: s.from, to: s.to, events: recorded, fps: cfg.fps, length });
+        const from = s.from ?? 0;
+        // `skip` takes stretches out of that part (a long wait, say): the video cuts across them, and says so.
+        s.kept = keptRanges(from, from + clipSeconds({ from: s.from, to: s.to, events: recorded, fps: cfg.fps, length }), s.skip);
+        s.clipSeconds = round(s.kept.reduce((sum, [a, b]) => sum + b - a, 0));
       } catch (e) {
         throw new Error(`scene ${s.id}: ${e.message}`);
       }
-      s.events = rangeEvents(recorded ?? { fps: cfg.fps, events: [] }, s.from ?? 0, s.clipSeconds, cfg.fps);
+      s.events = keptEvents(recorded ?? { fps: cfg.fps, events: [] }, s.kept, cfg.fps);
       s.duration = Math.max(s.clipSeconds, s.spoken);
     } else {
       s.duration = Math.max(s.duration ?? 5, s.spoken);
@@ -277,38 +280,83 @@ export function clipSeconds({ from = 0, to, events, fps = 30, length }) {
 /** A recording's events as seen from `from` seconds in, for `seconds`: those outside the range are dropped and the
  *  rest are renumbered so frame 0 is `from`. */
 export function rangeEvents(recorded, from, seconds, fps = 30) {
+  return keptEvents(recorded, [[from, from + seconds]], fps);
+}
+
+/** The stretches of a recording a clip plays, in its seconds: `from` to `stop`, less each `skip` ({ from, to }). A skip
+ *  must lie inside the clip, and skips may not overlap; they can be given in any order. */
+export function keptRanges(from, stop, skip = []) {
+  const skips = [...skip].sort((a, b) => a.from - b.from);
+  const kept = [];
+  let at = from;
+  for (const k of skips) {
+    if (!(k.to > k.from)) throw new Error(`a skip ends (${k.to}s) before it starts (${k.from}s)`);
+    if (k.from <= at || k.to >= stop) throw new Error(`the skip ${k.from}s–${k.to}s is not inside the clip (${round(at)}s–${round(stop)}s) or overlaps another`);
+    kept.push([at, k.from]);
+    at = k.to;
+  }
+  kept.push([at, stop]);
+  return kept.map(([a, b]) => [round(a), round(b)]);
+}
+
+/** A recording's events as the clip plays them: those in a stretch it skips (or outside it) are dropped, the rest are
+ *  renumbered from the clip's first frame, and a `skip` event (with the `seconds` left out) marks each cut. */
+export function keptEvents(recorded, kept, fps = 30) {
   const rate = recorded.fps ?? fps;
-  const first = Math.round(from * rate);
-  const frames = Math.round(seconds * rate);
-  const events = (recorded.events ?? [])
-    .map((e) => ({ ...e, frame: e.frame - first }))
-    .filter((e) => e.frame >= 0 && e.frame < frames);
-  return { ...recorded, fps: rate, frames, events };
+  const events = [];
+  let base = 0;
+  kept.forEach(([a, b], i) => {
+    const first = Math.round(a * rate);
+    const frames = Math.round((b - a) * rate);
+    if (i > 0) events.push({ frame: base, kind: "skip", seconds: round(a - kept[i - 1][1]) });
+    for (const e of recorded.events ?? []) {
+      const f = e.frame - first;
+      if (f >= 0 && f < frames) events.push({ ...e, frame: base + f });
+    }
+    base += frames;
+  });
+  return { ...recorded, fps: rate, frames: base, events };
 }
 
 // The part of the video a clip scene plays (`from` to `to`) is cut out by ffmpeg, and a clip shorter than its
 // narration holds its last frame, which ffmpeg makes by cloning it. The copy goes in build/, named for both.
 function heldClip(dir, s) {
   const from = s.from ?? 0;
-  const trim = from > 0 || s.to !== undefined;
+  const kept = s.kept ?? [[from, from + s.clipSeconds]];
+  const cuts = kept.length > 1;
+  const trim = from > 0 || s.to !== undefined || cuts;
   const hold = s.duration > s.clipSeconds + 0.05;
   if (!trim && !hold) return s.video;
-  const tag = [trim && `${round(from)}-${round(from + s.clipSeconds)}`, hold && `held-${Math.round(s.duration * 10)}`].filter(Boolean).join("-");
+  const tag = [trim && kept.map(([a, b]) => `${a}-${b}`).join("_"), hold && `held-${Math.round(s.duration * 10)}`].filter(Boolean).join("-");
   const out = join("build", `${basename(s.video, extname(s.video))}-${tag}.mp4`);
   const source = join(dir, s.video);
   const to = join(dir, out);
   mkdirSync(join(dir, "build"), { recursive: true });
   if (!existsSync(to) || statSync(to).mtimeMs < statSync(source).mtimeMs) {
     const args = ["-y", "-loglevel", "error"];
-    if (trim) args.push("-ss", String(round(from)), "-t", String(s.clipSeconds));
-    args.push("-i", source);
-    if (hold) args.push("-vf", `tpad=stop_mode=clone:stop_duration=${round(s.duration - s.clipSeconds)}`);
+    const pad = hold ? `tpad=stop_mode=clone:stop_duration=${round(s.duration - s.clipSeconds)}` : "";
+    if (cuts) {
+      // Each kept stretch, trimmed and joined end to end.
+      const parts = kept.map(([a, b], i) => `[0:v]trim=start=${a}:end=${b},setpts=PTS-STARTPTS[p${i}]`);
+      const join = `${kept.map((_, i) => `[p${i}]`).join("")}concat=n=${kept.length}:v=1:a=0${pad ? `,${pad}` : ""}[v]`;
+      args.push("-i", source, "-filter_complex", [...parts, join].join(";"), "-map", "[v]");
+    } else {
+      if (trim) args.push("-ss", String(round(from)), "-t", String(s.clipSeconds));
+      args.push("-i", source);
+      if (pad) args.push("-vf", pad);
+    }
     args.push("-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p", to);
     const r = spawnSync("ffmpeg", args);
     if (r.status !== 0) throw new Error(`ffmpeg could not ${trim ? "cut" : "hold the last frame of"} ${s.video}: ${r.stderr}`);
   }
   return out;
 }
+
+/** How much time a skip left out, as said on screen: "28s", "2m 05s". */
+export const skipLabel = (seconds) => {
+  const n = Math.round(seconds);
+  return n < 60 ? `${n}s` : `${Math.floor(n / 60)}m ${String(n % 60).padStart(2, "0")}s`;
+};
 
 export function clipScene(dir, cfg, s, t0) {
   const id = `s${s.n}`;
@@ -327,6 +375,7 @@ export function clipScene(dir, cfg, s, t0) {
 
   let rings = "";
   let keys = "";
+  let skips = "";
   const js = [];
   const fade = s.theme?.background ? `#${id}, #${id}v, #${id}g` : `#${id}, #${id}v`;
   js.push(`gsap.set("${fade}",{opacity:0});`);
@@ -363,6 +412,13 @@ export function clipScene(dir, cfg, s, t0) {
       js.push(`tl.to("#${id}k${i}",{opacity:1,y:0,duration:.2,ease:"power2.out"},${round(t)});tl.to("#${id}k${i}",{opacity:0,duration:.27},${round(t0 + run.at(-1).frame / fps + 0.93)});`);
       return;
     }
+    if (e.kind === "skip") {
+      // Time left out: a tag in the clip's corner for a moment, so the cut reads as a jump and not a glitch.
+      skips += `<div class="skipped" id="${id}j${i}"${still(cfg)} style="left:${round(card.x + card.width - 24)}px;top:${round(card.y + 24)}px">⏩ ${skipLabel(e.seconds)} later</div>`;
+      js.push(`gsap.set("#${id}j${i}",{opacity:0,y:-8});`);
+      js.push(`tl.to("#${id}j${i}",{opacity:1,y:0,duration:.25,ease:"power2.out"},${round(t)});tl.to("#${id}j${i}",{opacity:0,duration:.35},${round(t + 1.6)});`);
+      return;
+    }
     if (full) {
       // Only keys are drawn over a full-frame video.
     } else if (e.x !== undefined) {
@@ -392,7 +448,7 @@ export function clipScene(dir, cfg, s, t0) {
   const cursor = !pointer ? "" : `<div class="cursor" id="${id}cursor"><svg width="34" height="40" viewBox="0 0 17 20"><path d="M1 1 L1 15.5 L5 12 L7.8 18.2 L10.2 17.1 L7.5 11 L13 11 Z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg></div>`;
   const html = `${backdrop}<video id="${id}v" class="clip clipvideo${full ? " full" : ""}"${still(cfg)} src="${heldClip(dir, s)}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
 <div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}"${sceneStyle(s)}>
-  ${rings}${cursor}
+  ${rings}${skips}${cursor}
   <div class="keys"${still(cfg)}>${keys}</div></div>`;
   return { html, js: js.join("\n") };
 }
@@ -412,6 +468,8 @@ export const rules = `      .scene { font-family: var(--font); }
       .card img, .card video { width: 100%; display: block; }
       .clipvideo { position: absolute; object-fit: cover; border-radius: 18px; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
       .clipvideo.full { object-fit: contain; border-radius: 0; box-shadow: none; background: #000; }
+      .skipped { position: absolute; transform: translateX(-100%); padding: 10px 20px; border-radius: 14px; font-size: 30px; font-weight: 600;
+        color: var(--ink); background: var(--surface); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5); white-space: nowrap; }
       .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
       .ring { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
         border: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
@@ -491,7 +549,7 @@ export function cues(s) {
   if (s.type === "clip") {
     const fps = s.events.fps ?? 30;
     for (const e of s.events.events) {
-      const label = e.kind === "key" ? `key ${e.key}` : e.kind;
+      const label = e.kind === "key" ? `key ${e.key}` : e.kind === "skip" ? `skip ${skipLabel(e.seconds)}` : e.kind;
       out.push({ t: round(e.frame / fps), label });
     }
   } else {
