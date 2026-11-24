@@ -114,9 +114,14 @@ function probeSeconds(file) {
 }
 
 // The voice sits under the scene's own start, as a sibling of the stage, since HyperFrames wants media outside timed elements.
-const audioTag = (s, t0) => s.audio
-  ? `      <audio id="a${s.n}" src="${esc(s.audio)}" data-start="${round(t0 + (s.audioOffset ?? DEFAULT_AUDIO_OFFSET))}" data-duration="${round(s.audioSeconds)}" data-track-index="2"></audio>`
-  : "";
+const audioTag = (s, t0) => [
+  s.audio
+    ? `      <audio id="a${s.n}" src="${esc(s.audio)}" data-start="${round(t0 + (s.audioOffset ?? DEFAULT_AUDIO_OFFSET))}" data-duration="${round(s.audioSeconds)}" data-track-index="2"></audio>`
+    : "",
+  // What the app played in a clip, each on a track of its own under the voice.
+  ...(s.type === "clip" ? s.sounds ?? [] : []).map((k, i) =>
+    `      <audio id="a${s.n}s${i}" src="${esc(k.audio)}" data-start="${round(t0 + k.at)}" data-duration="${round(k.seconds)}" data-track-index="${3 + i}"></audio>`),
+].filter(Boolean).join("\n");
 
 function checkTheme(theme, where) {
   const unknown = Object.keys(theme).filter((k) => !(k in THEME));
@@ -184,10 +189,19 @@ export function load(dir) {
       // `from` and `to` (seconds) use only that part of the video; without `to` or events it plays to the video's end.
       const length = s.to === undefined && !recorded ? probeSeconds(join(dir, s.video)) : undefined;
       try {
+        // A time can name an event of the recording instead (`"event:3"`, `"event:-1+0.5"`), so a trim follows the script.
+        const at = (t) => eventTime(t, recorded, cfg.fps);
+        s.from = s.from === undefined ? undefined : at(s.from);
+        s.to = s.to === undefined ? undefined : at(s.to);
+        s.skip = (s.skip ?? []).map((k) => ({ from: at(k.from), to: at(k.to) }));
         const from = s.from ?? 0;
+        const stop = from + clipSeconds({ from: s.from, to: s.to, events: recorded, fps: cfg.fps, length });
+        // `fit` leaves out the longest stretches where nothing happens until the clip is about as long as its narration.
+        if (s.fit && recorded) s.skip.push(...fitSkips(recorded, from, stop, s.skip, s.spoken, cfg.fps));
         // `skip` takes stretches out of that part (a long wait, say): the video cuts across them, and says so.
-        s.kept = keptRanges(from, from + clipSeconds({ from: s.from, to: s.to, events: recorded, fps: cfg.fps, length }), s.skip);
+        s.kept = keptRanges(from, stop, s.skip);
         s.clipSeconds = round(s.kept.reduce((sum, [a, b]) => sum + b - a, 0));
+        s.sounds = clipSounds(dir, s, recorded, at, (cfg.loudness ?? DEFAULT_LOUDNESS) - 3);
       } catch (e) {
         throw new Error(`scene ${s.id}: ${e.message}`);
       }
@@ -282,6 +296,88 @@ export function clipSeconds({ from = 0, to, events, fps = 30, length }) {
  *  rest are renumbered so frame 0 is `from`. */
 export function rangeEvents(recorded, from, seconds, fps = 30) {
   return keptEvents(recorded, [[from, from + seconds]], fps);
+}
+
+/** A time in a recording: seconds, or `"event:N"` for when its Nth event happened (from 1; -1 is the last), with an
+ *  optional `+S` or `-S` seconds after it. */
+export function eventTime(t, recorded, fps = 30) {
+  if (typeof t === "number") return t;
+  const m = /^event:(-?\d+)([+-]\d+(?:\.\d+)?)?$/.exec(String(t).trim());
+  if (!m) throw new Error(`"${t}" is not a time: give seconds, or "event:N" (with "+S" or "-S" if it helps)`);
+  const events = (recorded?.events ?? []).filter((e) => e.kind !== "skip");
+  const n = Number(m[1]);
+  const e = n > 0 ? events[n - 1] : events[events.length + n];
+  if (!e) throw new Error(`"${t}": the recording has ${events.length} events`);
+  return round(e.frame / (recorded.fps ?? fps) + Number(m[2] ?? 0));
+}
+
+/** Skips that leave out the longest stretches with nothing happening (no event, and no sound playing) between `from`
+ *  and `stop`, until what is left lasts `target` seconds. A second is kept after each thing that happens and half a
+ *  second before the next, so what was done is seen and what comes is not a surprise. Never inside a given skip. */
+export function fitSkips(recorded, from, stop, skips = [], target, fps = 30) {
+  const rate = recorded.fps ?? fps;
+  const busy = (recorded.events ?? []).filter((e) => e.kind !== "skip").map((e) => {
+    const t = e.frame / rate;
+    return [t, t + (e.kind === "sound" ? (e.seconds ?? 0) : 0)];
+  }).filter(([a, b]) => b >= from && a <= stop).sort((x, y) => x[0] - y[0]);
+  const marks = [[from, from], ...busy, [stop, stop]];
+  const gaps = [];
+  for (let i = 1; i < marks.length; i++) {
+    const a = Math.max(...marks.slice(0, i).map((m) => m[1])) + 1.0;
+    const b = marks[i][0] - 0.5;
+    if (b - a > 0.4) gaps.push({ from: round(a), to: round(b) });
+  }
+  const free = gaps.filter((g) => !skips.some((k) => k.from < g.to && k.to > g.from));
+  let length = stop - from - skips.reduce((sum, k) => sum + k.to - k.from, 0);
+  const out = [];
+  for (const g of free.sort((x, y) => (y.to - y.from) - (x.to - x.from))) {
+    if (length <= target) break;
+    const cut = Math.min(g.to - g.from, length - target);
+    if (cut < 0.4) break;
+    out.push({ from: g.from, to: round(g.from + cut) });
+    length -= cut;
+  }
+  return out.sort((x, y) => x.from - y.from);
+}
+
+/** What a clip lets be heard besides its narration: the `sound` events of its recording (what the app played, which
+ *  `demoreel record` keeps beside it) and the scene's own `sounds` ({ at, file, from, seconds }), at their place in
+ *  the clip as it plays, each cut where its stretch of the clip ends. Levelled to `loudness`, under the voice. */
+function clipSounds(dir, s, recorded, at, loudness) {
+  const rate = recorded?.fps ?? 30;
+  const all = [
+    ...(recorded?.events ?? []).filter((e) => e.kind === "sound").map((e) => ({ at: e.frame / rate, file: e.file, from: e.from ?? 0, seconds: e.seconds })),
+    ...(s.sounds ?? []).map((k) => ({ ...k, at: at(k.at), from: k.from ?? 0 })),
+  ];
+  const out = [];
+  for (const k of all) {
+    let base = 0;
+    for (const [a, b] of s.kept) {
+      if (k.at >= a && k.at < b) {
+        const file = join(dir, k.file);
+        if (!existsSync(file)) throw new Error(`sound ${k.file} not found`);
+        const seconds = round(Math.min(k.seconds ?? probeSeconds(file) - k.from, b - k.at));
+        if (seconds > 0.1) out.push({ at: round(base + k.at - a), audio: soundCut(dir, k.file, k.from, seconds, loudness), seconds });
+        break;
+      }
+      base += b - a;
+    }
+  }
+  return out;
+}
+
+/** The part of a sound that is heard, levelled, in build/sound/. */
+function soundCut(dir, file, from, seconds, loudness) {
+  const source = join(dir, file);
+  const { size, mtimeMs } = statSync(source);
+  const key = createHash("sha1").update(`${file}:${size}:${mtimeMs}:${from}:${seconds}:${loudness}`).digest("hex").slice(0, 10);
+  const out = `build/sound/${basename(file, extname(file))}-${key}.wav`;
+  if (existsSync(join(dir, out))) return out;
+  mkdirSync(join(dir, "build/sound"), { recursive: true });
+  const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", String(from), "-t", String(seconds), "-i", source,
+    "-af", `loudnorm=I=${loudness}:TP=-2:LRA=11`, "-ar", "48000", join(dir, out)], { encoding: "utf8" });
+  if (r.status !== 0) throw new Error(`could not use the sound ${file}: ${r.stderr || r.error}`);
+  return out;
 }
 
 /** The stretches of a recording a clip plays, in its seconds: `from` to `stop`, less each `skip` ({ from, to }). A skip
@@ -413,6 +509,7 @@ export function clipScene(dir, cfg, s, t0) {
       js.push(`tl.to("#${id}k${i}",{opacity:1,y:0,duration:.2,ease:"power2.out"},${round(t)});tl.to("#${id}k${i}",{opacity:0,duration:.27},${round(t0 + run.at(-1).frame / fps + 0.93)});`);
       return;
     }
+    if (e.kind === "sound") return;
     if (e.kind === "skip") {
       // Time left out: a tag in the clip's corner for a moment, so the cut reads as a jump and not a glitch.
       skips += `<div class="skipped" id="${id}j${i}"${still(cfg)} style="left:${round(card.x + card.width - 24)}px;top:${round(card.y + 24)}px">⏩ ${skipLabel(e.seconds)} later</div>`;
@@ -594,7 +691,7 @@ export function cues(s) {
   if (s.type === "clip") {
     const fps = s.events.fps ?? 30;
     for (const e of s.events.events) {
-      const label = e.kind === "key" ? `key ${e.key}` : e.kind === "skip" ? `skip ${skipLabel(e.seconds)}` : e.kind;
+      const label = e.kind === "key" ? `key ${e.key}` : e.kind === "skip" ? `skip ${skipLabel(e.seconds)}` : e.kind === "sound" ? "sound" : e.kind;
       out.push({ t: round(e.frame / fps), label });
     }
   } else {

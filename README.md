@@ -476,6 +476,17 @@ scene plays: a long wait for a render, say. The video cuts across each one, the 
 clip's corner says how much was left out ("⏩ 28s later"); the cut is a `skip` cue too, so the narration can talk over
 it.
 
+A clip's `from`, `to` and `skip` times can name an event of its recording instead of a second: `"event:3"` is when the
+third event (click, key, …) happened, `"event:-1"` the last, and `"event:2+0.5"` half a second after the second. A trim
+written that way still fits after the script changes. `"fit": true` leaves out the longest stretches where nothing
+happens (a second after each event and half a second before the next are kept) until the clip lasts about as long as its
+narration.
+
+A clip can be heard as well as seen. A recording's `sound` events (an app's driver notes what it plays, as Booth's does)
+name the files, which `demoreel record` copies beside the clip into `<id>.sounds/`; a scene's own `"sounds"` list adds
+more: `{ "at": 17, "file": "ding.wav", "from": 0, "seconds": 2 }`, with `at` a time like `from`'s. Each plays at its
+place in the clip as trimmed, until its stretch ends, levelled 3 dB under the narration.
+
 `"captions": "burn"` at the top of `demo.json` draws the captions into the film, low in the frame, for a video that
 plays muted (a store page, a feed). They are the same captions as `captions.vtt`, from each scene's recorded audio, so
 `build` transcribes the audio first (Parakeet, cached in `build/`); key caps move up out of their way.

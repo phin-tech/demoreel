@@ -11,8 +11,8 @@
 //
 //   "driver": "vhs" is a Mac app built with swift-vhs (github.com/phin-tech/swift-vhs) in its Debug build: the same block,
 //   with "drive" defaulting to vhs-drive and "socketEnv" to VHS_SOCKET. Its scripts are typecase-drive's lines.
-import { existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { sleep } from "./util.mjs";
 
@@ -30,6 +30,24 @@ export async function recordScenes(dir, only, { log = console.log } = {}) {
     done.push(r);
   }
   return done;
+}
+
+/** What the app played while it was recorded (its `sound` events name the files) is copied beside the recording, into
+ *  <id>.sounds/, since the app's own copy may be gone by the time the film is made; the events then name the copies. */
+export function keepSounds(dir, scene, events) {
+  const sounds = (events.events ?? []).filter((e) => e.kind === "sound" && e.file);
+  if (!sounds.length) return;
+  const folder = `${scene.id}.sounds`;
+  rmSync(join(dir, folder), { recursive: true, force: true });
+  mkdirSync(join(dir, folder), { recursive: true });
+  sounds.forEach((e, i) => {
+    const source = resolve(dir, e.file);
+    if (!existsSync(source)) { e.missing = e.file; return; }
+    const name = `${String(i + 1).padStart(2, "0")}-${basename(source)}`;
+    copyFileSync(source, join(dir, folder, name));
+    e.file = `${folder}/${name}`;
+  });
+  events.events = events.events.filter((e) => !e.missing);
 }
 
 /** The drivers that run as a CLI against a socket the app listens on, and their defaults. */
@@ -88,6 +106,7 @@ export async function record(dir, scene, { log = console.log } = {}) {
     // The window's size goes with the events, so a scene need not say it.
     const events = JSON.parse(readFileSync(join(frames, "events.json"), "utf8"));
     if (size) events.window = { w: Number(size[1]), h: Number(size[2]) };
+    keepSounds(dir, scene, events);
     writeFileSync(eventsFile, JSON.stringify(events, null, 1) + "\n");
     return { video, events: eventsFile, frames: events.frames };
   } finally {
