@@ -50,3 +50,14 @@ test("the manifest names the film when the export is one file, and each scene's 
   assert.equal(scenes.film, undefined);
   assert.equal(scenes.scenes[1].file, "scenes/02-browse.mp4");
 });
+
+test("captions come as WebVTT too, timed along the film or within the scene", async () => {
+  const { vtt } = await import("../src/build.mjs");
+  const rows = [
+    { start: 0, audioOffset: 0.3, captions: [{ start: 0, end: 1.25, text: "One place." }] },
+    { start: 9.3, audioOffset: 0.3, captions: [{ start: 0.5, end: 2, text: "Pick a box." }] },
+  ];
+  assert.equal(vtt(rows, true), "WEBVTT\n\n00:00:00.300 --> 00:00:01.550\nOne place.\n\n00:00:10.100 --> 00:00:11.600\nPick a box.\n");
+  assert.equal(vtt([rows[1]], false), "WEBVTT\n\n00:00:00.800 --> 00:00:02.300\nPick a box.\n");
+  assert.equal(vtt([{ start: 0, captions: [] }], true), "");
+});

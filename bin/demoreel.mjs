@@ -198,8 +198,8 @@ if (command === "export") {
   writeStoryboard(dir, cfg, out, perScene ? {} : { film: `${name}.mp4` });
   if (perScene) {
     writeVids(cfg, out);
-    console.log("wrote out/vids/scene-*/ (video, narration, captions), out/storyboard.md, out/manifest.json, out/captions.srt");
+    console.log("wrote out/vids/scene-*/ (video, narration, captions), out/storyboard.md, out/manifest.json, out/captions.srt and .vtt");
   } else {
-    console.log(`wrote out/${name}.mp4 (a chapter at each scene), out/chapters.txt, out/storyboard.md, out/manifest.json, out/captions.srt`);
+    console.log(`wrote out/${name}.mp4 (a chapter at each scene), out/chapters.txt, out/storyboard.md, out/manifest.json, out/captions.srt and .vtt`);
   }
 }

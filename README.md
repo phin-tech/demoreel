@@ -334,7 +334,7 @@ Drag a scene's mp4 into Google Vids (or any editor), paste its `narration.txt` i
 scene's `voice.wav` and, if it has recorded audio (step 3), `captions.srt` with real timing: Parakeet transcribes the
 audio on this machine and the times are laid onto the words of your narration, so the text is what you meant and the
 timing is what was said. Install it once with `npx hyperframes models install parakeet`. Results are cached in `build/`,
-and a scene without audio gets no captions. Either way, `out/captions.srt` has the captions for the whole film, and
+and a scene without audio gets no captions. Either way, `out/captions.srt` and `out/captions.vtt` (WebVTT, for browsers and YouTube) have the captions for the whole film, and
 `out/storyboard.md` and `out/manifest.json` (with each scene's length, where it starts and its on-screen cues) hold the
 whole plan. The manifest's `film` names the one file when there is one; without it, each scene's `file` is its own.
 Booth reads either.

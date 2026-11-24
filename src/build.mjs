@@ -472,12 +472,24 @@ export function writeStoryboard(dir, cfg, outDir, { film } = {}) {
   }
   writeFileSync(join(outDir, "storyboard.md"), md.join("\n"));
   const whole = srt(rows, true);
+  rmSync(join(outDir, "captions.vtt"), { force: true });
+  if (whole) writeFileSync(join(outDir, "captions.vtt"), vtt(rows, true));
   // Nothing to write, and nothing stale left from an earlier export.
   rmSync(join(outDir, "captions.srt"), { force: true });
   if (whole) writeFileSync(join(outDir, "captions.srt"), whole);
 }
 
 // Captions come only from real audio (see captions.mjs). `whole` runs the times across the film, else from the scene's start.
+/** The same captions as WebVTT, which browsers, YouTube and most editors read. */
+export function vtt(rows, whole) {
+  const cues = [];
+  for (const r of rows) {
+    const base = (whole ? r.start : 0) + (r.audioOffset ?? DEFAULT_AUDIO_OFFSET);
+    for (const c of r.captions ?? []) cues.push(`${timecode(base + c.start).replace(",", ".")} --> ${timecode(base + c.end).replace(",", ".")}\n${c.text}\n`);
+  }
+  return cues.length ? `WEBVTT\n\n${cues.join("\n")}` : "";
+}
+
 function srt(rows, whole) {
   let n = 1;
   const out = [];
@@ -501,7 +513,10 @@ export function writeVids(cfg, outDir) {
     const row = { narrationClean: cleanNarration(s.narration), duration: s.duration, audioOffset: s.audioOffset ?? DEFAULT_AUDIO_OFFSET, captions: s.captions };
     writeFileSync(join(folder, "narration.txt"), (row.narrationClean || "(no narration yet)") + "\n");
     if (s.narration) writeFileSync(join(folder, "narration-with-tags.txt"), s.narration + "\n");
-    if (s.captions?.length) writeFileSync(join(folder, "captions.srt"), srt([row], false));
+    if (s.captions?.length) {
+      writeFileSync(join(folder, "captions.srt"), srt([row], false));
+      writeFileSync(join(folder, "captions.vtt"), vtt([row], false));
+    }
     index.push(`scene-${s.id}/  ${round(s.duration)}s`);
   }
   writeFileSync(join(vids, "HOW-TO.txt"), [
@@ -512,7 +527,7 @@ export function writeVids(cfg, outDir) {
     "",
     "In Google Vids: make a new video, upload or drag in each scene's .mp4 in order, and paste that scene's",
     "narration.txt into its voice-over. narration-with-tags.txt keeps the audio tags for a voice engine that reads them.",
-    "captions.srt is there for a scene with recorded audio: its words, timed from what was said.",
+    "captions.srt and captions.vtt are there for a scene with recorded audio: its words, timed from what was said.",
     "",
   ].join("\n"));
 }
