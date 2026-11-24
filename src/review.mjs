@@ -36,11 +36,13 @@ export function misheard(script, heard) {
 }
 
 /** Stretches longer than `longest` seconds in a scene where its voice says nothing: before it starts, between words, after. */
-export function quiet(words, duration, offset, longest = 4) {
-  const times = [[0, offset], ...words.map((w) => [offset + w.start, offset + w.end]), [duration, duration]];
+export function quiet(words, duration, offset, longest = 4, sounds = []) {
+  // What the clip plays (a take, a chime) counts as heard, as the voice does.
+  const times = [[0, offset], ...words.map((w) => [offset + w.start, offset + w.end]), ...sounds.map((k) => [k.at, k.at + k.seconds]), [duration, duration]]
+    .sort((a, b) => a[0] - b[0]);
   const out = [];
   for (let k = 1; k < times.length; k++) {
-    const from = times[k - 1][1], to = times[k][0];
+    const from = Math.max(...times.slice(0, k).map((t) => t[1])), to = times[k][0];
     if (to - from > longest) out.push({ from: round(from), to: round(to) });
   }
   return out;
@@ -66,7 +68,7 @@ export function writeReview(dir, cfg) {
       flagged++;
       md.push(`- **"${m.meant}"** was heard as ${m.heard ? `"${m.heard}"` : "nothing"}`);
     }
-    for (const q of quiet(words, s.duration, s.audioOffset ?? 0.5)) {
+    for (const q of quiet(words, s.duration, s.audioOffset ?? 0.5, 4, s.type === "clip" ? s.sounds ?? [] : [])) {
       flagged++;
       md.push(`- quiet from ${q.from}s to ${q.to}s into the scene`);
     }

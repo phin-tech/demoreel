@@ -18,3 +18,9 @@ test("long quiet stretches are found, before, between and after the words", () =
   assert.deepEqual(quiet(words, 14, 0.5), [{ from: 2.5, to: 7.5 }, { from: 8.5, to: 14 }]);
   assert.deepEqual(quiet(words, 9, 0.5), [{ from: 2.5, to: 7.5 }]);
 });
+
+test("what a clip plays isn't quiet", () => {
+  const words = [{ start: 0, end: 2 }];
+  assert.deepEqual(quiet(words, 14, 0.5, 4, [{ at: 4, seconds: 6 }]), []);
+  assert.deepEqual(quiet(words, 20, 0.5, 4, [{ at: 4, seconds: 6 }]), [{ from: 10, to: 20 }]);
+});
