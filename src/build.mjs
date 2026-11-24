@@ -5,12 +5,11 @@ import { join, basename, extname, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { esc, round } from "./util.mjs";
 import { diagramImage, hubBlock, hubVariables } from "./diagram.mjs";
-import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { GSAP } from "./hyperframes.mjs";
 
-const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
-// The stage is laid out at 1920x1080 and drawn at twice that, which is what keeps a 4K frame sharp; `scale: 1` or
-// DEMOREEL_SCALE=1 (the CLI's --hd) draws it at 1080p.
+// The page is laid out at 1920x1080 and HyperFrames draws it at twice that (Chrome's device scale, not a CSS zoom), so a
+// 4K frame is sharp; `scale: 1` or DEMOREEL_SCALE=1 (the CLI's --hd) draws it at 1080p.
 const DEFAULT_SCALE = 2;
 // The voice starts this many seconds into its scene, so the picture is there before the first word.
 const DEFAULT_AUDIO_OFFSET = 0.3;
@@ -18,13 +17,43 @@ const DEFAULT_AUDIO_OFFSET = 0.3;
 // Keys this close together, two or more of them, are shown as one piece of typing.
 const TYPING_GAP_FRAMES = 3;
 
-const THEME = {
+// The look of a film. `theme` in demo.json changes any of these for the whole film, and a scene's own `theme` for that
+// scene. Each is a HyperFrames variable too, so `hyperframes render --variables '{"accent":"#3a7be8"}'` re-themes a
+// built film without touching demo.json.
+export const THEME = {
   accent: "#e8a53a",
   ink: "#f3efe6",
   muted: "#a9a49a",
+  surface: "rgba(40,38,44,.92)",
   font: '-apple-system, "SF Pro Display", "Helvetica Neue", sans-serif',
   background: "radial-gradient(1200px 800px at 25% 10%, #2e2a24 0%, #17161a 55%, #0e0e11 100%)",
 };
+const THEME_TYPES = { accent: "color", ink: "color", muted: "color", surface: "string", font: "string", background: "string" };
+const THEME_LABELS = { accent: "Accent", ink: "Text", muted: "Muted text", surface: "Key cap", font: "Font", background: "Background" };
+
+/** The theme as CSS custom properties, `--accent: …; --ink: …`, for a style attribute or a rule. */
+export const themeVars = (t) => Object.keys(THEME).filter((k) => t[k] !== undefined).map((k) => `--${k}: ${t[k]};`).join(" ");
+
+// HyperFrames' variable declarations for the theme: it sets each as the CSS property of the same name.
+const themeDeclarations = (t) => Object.keys(THEME).map((id) => ({ id, type: THEME_TYPES[id], label: THEME_LABELS[id], default: t[id] }));
+
+/** Output sizes HyperFrames renders at by preset, since its `--resolution` takes only these names. */
+const RESOLUTIONS = {
+  "1920x1080": "landscape", "1080x1920": "portrait", "1080x1080": "square",
+  "3840x2160": "landscape-4k", "2160x3840": "portrait-4k", "2160x2160": "square-4k",
+  "2560x1440": "landscape-1440p", "1440x2560": "portrait-1440p", "1440x1440": "square-1440p",
+};
+
+/** The `hyperframes render` flags that draw the film at its `scale`: none at 1, else the preset for the output size. */
+export function resolutionArgs(cfg) {
+  if (cfg.scale === 1) return [];
+  const size = `${cfg.width * cfg.scale}x${cfg.height * cfg.scale}`;
+  const preset = RESOLUTIONS[size];
+  if (!preset) {
+    throw new Error(`HyperFrames can't draw a ${cfg.width}x${cfg.height} film at scale ${cfg.scale} (${size}); its sizes are ${Object.keys(RESOLUTIONS).join(", ")}. Change "scale" or the size, or use --hd.`);
+  }
+  return ["--resolution", preset];
+}
 const GLYPHS = { cmd: "⌘", shift: "⇧", alt: "⌥", ctrl: "⌃", enter: "↵", escape: "esc", space: "space", tab: "⇥", backspace: "⌫" };
 
 export const cleanNarration = (s = "") => s.replace(/\[[^\]]*\]\s*/g, "").replace(/\s+/g, " ").trim();
@@ -88,12 +117,18 @@ const audioTag = (s, t0) => s.audio
   ? `      <audio id="a${s.n}" src="${esc(s.audio)}" data-start="${round(t0 + (s.audioOffset ?? DEFAULT_AUDIO_OFFSET))}" data-duration="${round(s.audioSeconds)}" data-track-index="2"></audio>`
   : "";
 
+function checkTheme(theme, where) {
+  const unknown = Object.keys(theme).filter((k) => !(k in THEME));
+  if (unknown.length) throw new Error(`${where}: unknown theme key ${unknown.join(", ")}; a theme has ${Object.keys(THEME).join(", ")}`);
+}
+
 export function load(dir) {
   const cfg = JSON.parse(readFileSync(join(dir, "demo.json"), "utf8"));
   cfg.width ??= 1920;
   cfg.height ??= 1080;
   cfg.fps ??= 30;
   cfg.scale = Number(process.env.DEMOREEL_SCALE) || cfg.scale || DEFAULT_SCALE;
+  if (cfg.theme) checkTheme(cfg.theme, "theme");
   cfg.theme = { ...THEME, ...cfg.theme };
   const takesFile = join(dir, "audio/takes.json");
   const takes = existsSync(takesFile) ? JSON.parse(readFileSync(takesFile, "utf8")) : {};
@@ -101,6 +136,7 @@ export function load(dir) {
   cfg.scenes = cfg.scenes.map((scene, i) => {
     const n = String(i + 1).padStart(2, "0");
     const s = { ...scene, n, id: `${n}-${scene.id ?? scene.type}` };
+    if (s.theme) checkTheme(s.theme, `scene ${s.id}`);
     // A scene lasts as long as its narration takes to say (its `audioSeconds` if measured, else `wordsPerMinute`) and a short pause, if that is longer
     // than the scene's own `duration` (a clip's is the clip's length), so the voice is never cut off.
     // A take chosen in Booth (audio/takes.json) is the scene's audio unless the scene names one itself.
@@ -108,6 +144,8 @@ export function load(dir) {
     // A recorded `audio` file is measured, and that is its `audioSeconds`.
     if (s.audio) {
       if (!existsSync(join(dir, s.audio))) throw new Error(`scene ${s.id}: audio file ${s.audio} not found`);
+      // The file as recorded, which Booth keeps its notes beside; the voice used is a levelled copy of it.
+      s.recorded = s.audio;
       s.audio = levelled(dir, s.audio, cfg.loudness ?? DEFAULT_LOUDNESS);
       s.audioSeconds = probeSeconds(join(dir, s.audio));
     }
@@ -164,19 +202,26 @@ function image(dir, rel, width, native, scale) {
 
 // Every effect is a plain `tl.to` after a `gsap.set`, since a `fromTo` draws its first state at once and would
 // show a click ring or key cap before its time.
+// A scene with its own `theme` carries it as CSS properties, so its text and accents change and the film's stay as they are.
+const sceneStyle = (s) => (s.theme ? ` style="${esc(themeVars(s.theme))}"` : "");
+// With `motionBlur` only the pointer is blurred, so everything else that moves opts out.
+const still = (cfg) => (cfg.motionBlur ? ` data-motion-blur="off"` : "");
+
 export function textScene(dir, cfg, s, t0, opts = {}) {
   const id = `s${s.n}`;
   const bullets = (s.bullets ?? []).map((b) => `<li><i></i><span>${esc(b)}</span></li>`).join("");
   const cards = (s.cards ?? []).map((c, k) => {
     const src = image(dir, c.image, c.width, Boolean(c.zoom), cfg.scale);
-    return `<div class="card" id="${id}c${k}" style="left:${c.x}px;top:${c.y}px;width:${c.width}px"><img src="${src}" /></div>`;
+    return `<div class="card" id="${id}c${k}"${still(cfg)} style="left:${c.x}px;top:${c.y}px;width:${c.width}px"><img src="${src}" /></div>`;
   }).join("");
   // A HyperFrames block mounted in a box of its own: it plays from a little after the scene starts and ends with it.
   const block = s.block
-    ? `<div id="${id}b" data-composition-id="constellation-hub" data-composition-src="${esc(s.block.src)}" data-variable-values="${esc(JSON.stringify(s.block.vars))}" data-start="${round(t0 + 0.3)}" data-duration="${round(s.duration - 0.7)}" data-track-index="${Number(s.n) + 100}" style="position:absolute;left:${s.block.x}px;top:${s.block.y}px;width:${s.block.width}px;height:${s.block.height}px"></div>`
+    ? `<div id="${id}b"${still(cfg)} data-composition-id="constellation-hub" data-composition-src="${esc(s.block.src)}" data-variable-values="${esc(JSON.stringify(s.block.vars))}" data-start="${round(t0 + 0.3)}" data-duration="${round(s.duration - 0.7)}" data-track-index="${Number(s.n) + 100}" style="position:absolute;left:${s.block.x}px;top:${s.block.y}px;width:${s.block.width}px;height:${s.block.height}px"></div>`
     : "";
-  const html = `<div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}">
-  <div class="left${s.layout === "top" ? " top" : ""}">${s.kicker ? `<div class="kicker">${esc(s.kicker)}</div>` : ""}<div class="title">${esc(s.title ?? "")}</div><ul class="bullets">${bullets}</ul></div>${cards}${block}</div>`;
+  // A scene with its own background paints it across the frame, over the film's.
+  const bg = s.theme?.background ? `<div class="backdrop"></div>` : "";
+  const html = `<div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}"${sceneStyle(s)}>
+  ${bg}<div class="left${s.layout === "top" ? " top" : ""}"${still(cfg)}>${s.kicker ? `<div class="kicker">${esc(s.kicker)}</div>` : ""}<div class="title">${esc(s.title ?? "")}</div><ul class="bullets">${bullets}</ul></div>${cards}${block}</div>`;
 
   const js = [];
   js.push(`gsap.set("#${id}",{opacity:0});`);
@@ -232,9 +277,10 @@ export function clipScene(dir, cfg, s, t0) {
   let rings = "";
   let keys = "";
   const js = [];
-  js.push(`gsap.set("#${id}, #${id}v",{opacity:0});`);
-  js.push(`tl.to("#${id}, #${id}v",{opacity:1,duration:.4},${round(t0)});`);
-  js.push(`tl.to("#${id}, #${id}v",{opacity:0,duration:.4},${round(t0 + s.duration - 0.4)});`);
+  const fade = s.theme?.background ? `#${id}, #${id}v, #${id}g` : `#${id}, #${id}v`;
+  js.push(`gsap.set("${fade}",{opacity:0});`);
+  js.push(`tl.to("${fade}",{opacity:1,duration:.4},${round(t0)});`);
+  js.push(`tl.to("${fade}",{opacity:0,duration:.4},${round(t0 + s.duration - 0.4)});`);
   js.push(`gsap.set("#${id}cursor",{x:${start.x},y:${start.y}});`);
   const events = s.events.events;
   const gap = s.typingGap ?? TYPING_GAP_FRAMES;
@@ -272,7 +318,7 @@ export function clipScene(dir, cfg, s, t0) {
     }
     if (e.kind === "click") {
       const to = at(e);
-      rings += `<div class="ring" id="${id}r${i}"></div>`;
+      rings += `<div class="ring" id="${id}r${i}"${still(cfg)}></div>`;
       js.push(`gsap.set("#${id}r${i}",{x:${to.x},y:${to.y},scale:.17,opacity:0});`);
       js.push(`tl.to("#${id}cursor",{scale:.86,duration:.08},${round(t)});tl.to("#${id}cursor",{scale:1,duration:.1},${round(t + 0.1)});`);
       js.push(`tl.to("#${id}r${i}",{opacity:1,duration:.01},${round(t)});tl.to("#${id}r${i}",{scale:1,opacity:0,duration:.66,ease:"power2.out"},${round(t + 0.01)});`);
@@ -285,16 +331,22 @@ export function clipScene(dir, cfg, s, t0) {
     }
   });
 
-  // The video is not inside the timed scene div, which would leave the renderer unable to find it, and has an id.
-  const html = `<video id="${id}v" class="clip clipvideo" src="${heldClip(dir, s)}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
-<div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}">
+  // The video is not inside the timed scene div, which would leave the renderer unable to find it, and has an id. So a
+  // scene background of its own is a timed element of its own too, under the video, fading in and out with it.
+  const backdrop = s.theme?.background
+    ? `<div id="${id}g" class="clip backdrop" style="${esc(themeVars(s.theme))}" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 200}"></div>\n`
+    : "";
+  const html = `${backdrop}<video id="${id}v" class="clip clipvideo"${still(cfg)} src="${heldClip(dir, s)}" muted playsinline style="left:${card.x}px;top:${card.y}px;width:${card.width}px;height:${height}px" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n) + 100}"></video>
+<div id="${id}" class="scene clip" data-start="${round(t0)}" data-duration="${round(s.duration)}" data-track-index="${Number(s.n)}"${sceneStyle(s)}>
   ${rings}<div class="cursor" id="${id}cursor"><svg width="34" height="40" viewBox="0 0 17 20"><path d="M1 1 L1 15.5 L5 12 L7.8 18.2 L10.2 17.1 L7.5 11 L13 11 Z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg></div>
-  <div class="keys">${keys}</div></div>`;
+  <div class="keys"${still(cfg)}>${keys}</div></div>`;
   return { html, js: js.join("\n") };
 }
 
 // The look of a scene, shared by the film's page and the deck's slides.
-export const rules = `      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
+export const rules = `      .scene { font-family: var(--font); }
+      .backdrop { position: absolute; inset: 0; background: var(--background); }
+      .left { position: absolute; left: 110px; top: 0; bottom: 0; width: 700px; display: flex; flex-direction: column; justify-content: center; }
       .left.top { top: 80px; bottom: auto; left: 110px; width: 1700px; }
       .kicker { color: var(--accent); font-size: 26px; letter-spacing: 4px; text-transform: uppercase; font-weight: 600; }
       .title { color: var(--ink); font-size: 66px; font-weight: 700; line-height: 1.06; margin-top: 14px; letter-spacing: -1.5px; text-wrap: balance; }
@@ -307,35 +359,35 @@ export const rules = `      .left { position: absolute; left: 110px; top: 0; bot
       .clipvideo { position: absolute; object-fit: cover; border-radius: 18px; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
       .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
       .ring { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%;
-        border: 4px solid var(--accent); background: rgba(232,165,58,.18); }
+        border: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
       .keys { position: absolute; left: 0; right: 0; bottom: 36px; height: 0; }
       .keyset { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 10px; }
       .cap { min-width: 64px; padding: 10px 20px; border-radius: 14px; text-align: center; font-size: 38px; font-weight: 600; color: var(--ink);
-        background: rgba(40,38,44,.92); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 -3px 0 rgba(0,0,0,.35); }
+        background: var(--surface); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 -3px 0 rgba(0,0,0,.35); }
 `;
 
+// The page is the film at its layout size; HyperFrames draws it at `scale` when it renders (see resolutionArgs).
 function page(cfg, parts, total, audio = "") {
-  const t = cfg.theme;
-  const W = cfg.width * cfg.scale;
-  const H = cfg.height * cfg.scale;
+  const W = cfg.width;
+  const H = cfg.height;
+  const blur = cfg.motionBlur ? ` data-motion-blur="on"` : "";
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-composition-variables="${esc(JSON.stringify(themeDeclarations(cfg.theme)))}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=${W}, height=${H}" />
     <script src="build/gsap.min.js"></script>
     <style>
-      :root { --ink: ${t.ink}; --accent: ${t.accent}; --muted: ${t.muted}; }
+      :root { ${themeVars(cfg.theme)} }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { width: ${W}px; height: ${H}px; overflow: hidden; background: #0e0e11; }
-      #stage { position: absolute; left: 0; top: 0; width: ${cfg.width}px; height: ${cfg.height}px; transform: scale(${cfg.scale});
-        transform-origin: 0 0; font-family: ${t.font}; background: ${t.background}; overflow: hidden; }
-      #stage .scene.clip { position: absolute; left: 0; top: 0; right: auto; bottom: auto; width: ${cfg.width}px; height: ${cfg.height}px; }
+      #stage { position: absolute; left: 0; top: 0; width: ${W}px; height: ${H}px; font-family: var(--font); background: var(--background); overflow: hidden; }
+      #stage .scene.clip { position: absolute; left: 0; top: 0; right: auto; bottom: auto; width: ${W}px; height: ${H}px; }
 ${rules}
     </style>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-start="0" data-duration="${round(total)}" data-width="${W}" data-height="${H}" data-fps="${cfg.fps}">
+    <div id="root" data-composition-id="main" data-start="0" data-duration="${round(total)}" data-width="${W}" data-height="${H}" data-fps="${cfg.fps}"${blur}>
       <div id="stage">
 ${parts.map((p) => p.html).join("\n")}
       </div>
@@ -362,7 +414,7 @@ const make = (dir, cfg, s, t0) => (s.type === "clip" ? clipScene(dir, cfg, s, t0
 export function build(dir, { scenes = false } = {}) {
   const cfg = load(dir);
   mkdirSync(join(dir, "build"), { recursive: true });
-  copyFileSync(join(TOOL, "node_modules/hyperframes/dist/vendor/npm/gsap@3.15.0/dist/gsap.min.js"), join(dir, "build/gsap.min.js"));
+  copyFileSync(GSAP, join(dir, "build/gsap.min.js"));
   writeFileSync(join(dir, "index.html"), page(cfg, cfg.scenes.map((s) => make(dir, cfg, s, s.start)), cfg.total, cfg.scenes.map((s) => audioTag(s, s.start)).filter(Boolean).join("\n")));
   if (!scenes) removeScenePages(dir, cfg);
   if (scenes) {
@@ -399,26 +451,27 @@ export function cues(s) {
   return out.sort((a, b) => a.t - b.t);
 }
 
-/** The storyboard, the manifest and captions: what an editor needs besides the scene files. */
-export function writeStoryboard(dir, cfg, outDir) {
+/** The storyboard, the manifest and captions: what an editor needs besides the video. With `film` (its name in `outDir`)
+ *  the export is that one file and each scene is the stretch of it from its `start` for its `duration`; without, each
+ *  scene is its own file in scenes/. */
+export function writeStoryboard(dir, cfg, outDir, { film } = {}) {
   mkdirSync(outDir, { recursive: true });
   const rows = cfg.scenes.map((s) => ({
-    id: s.id, file: `scenes/${s.id}.mp4`, start: round(s.start), duration: round(s.duration), type: s.type,
+    id: s.id, file: film ?? `scenes/${s.id}.mp4`, start: round(s.start), duration: round(s.duration), type: s.type,
     onScreen: [s.kicker, s.title, ...(s.bullets ?? [])].filter(Boolean),
     narration: s.narration ?? "", narrationClean: cleanNarration(s.narration), chunks: chunks(s.narration), cues: cues(s),
     audioOffset: s.audioOffset ?? DEFAULT_AUDIO_OFFSET, captions: s.captions,
   }));
-  writeFileSync(join(outDir, "manifest.json"), JSON.stringify({ fps: cfg.fps, total: round(cfg.total), scenes: rows }, null, 2) + "\n");
-  const md = [`# ${cfg.title ?? "Demo"}: storyboard`, "", `Total ${round(cfg.total)}s. One mp4 per scene in \`scenes/\`; narration below is the text to voice (tags are for the voice engine; captions have them stripped).`, ""];
+  writeFileSync(join(outDir, "manifest.json"), JSON.stringify({ fps: cfg.fps, total: round(cfg.total), ...(film ? { film } : {}), scenes: rows }, null, 2) + "\n");
+  const files = film ? `The whole film in \`${film}\`, a chapter at each scene` : "One mp4 per scene in `scenes/`";
+  const md = [`# ${cfg.title ?? "Demo"}: storyboard`, "", `Total ${round(cfg.total)}s. ${files}; narration below is the text to voice (tags are for the voice engine; captions have them stripped).`, ""];
   for (const r of rows) {
-    md.push(`## ${r.id} (${r.start}s–${round(r.start + r.duration)}s)`, "", `File: \`${r.file}\``);
+    md.push(`## ${r.id} (${r.start}s–${round(r.start + r.duration)}s)`, "", film ? `In \`${film}\` from ${r.start}s` : `File: \`${r.file}\``);
     if (r.onScreen.length) md.push("", "On screen:", ...r.onScreen.map((x) => `- ${x}`));
     md.push("", r.narration ? `Narration: ${r.narration}` : "Narration: (none yet)", "");
   }
   writeFileSync(join(outDir, "storyboard.md"), md.join("\n"));
   const whole = srt(rows, true);
-  // Nothing to write, and nothing stale left from an earlier export.
-  rmSync(join(outDir, "captions.srt"), { force: true });
   // Nothing to write, and nothing stale left from an earlier export.
   rmSync(join(outDir, "captions.srt"), { force: true });
   if (whole) writeFileSync(join(outDir, "captions.srt"), whole);

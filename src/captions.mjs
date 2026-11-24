@@ -5,12 +5,13 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "no
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { cleanNarration } from "./build.mjs";
+import { hyperframes } from "./hyperframes.mjs";
 import { round } from "./util.mjs";
 
 const norm = (w) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 
 /** The spoken words of a scene's audio with their times, from a cache in build/ unless the audio has changed. */
-export function transcribe(dir, hyperframes, s) {
+export function transcribe(dir, s) {
   const source = join(dir, s.audio);
   const cache = join(dir, "build", `${s.id}.words.json`);
   const stamp = statSync(source).mtimeMs;
@@ -24,7 +25,7 @@ export function transcribe(dir, hyperframes, s) {
   const wav = join(work, `${s.id}.wav`);
   const r = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-i", source, "-ar", "16000", "-ac", "1", wav]);
   if (r.status !== 0) throw new Error(`ffmpeg could not read ${s.audio}: ${r.stderr}`);
-  const t = spawnSync(hyperframes, ["transcribe", wav, "-e", "parakeet", "--json"], { cwd: work, encoding: "utf8" });
+  const t = hyperframes(["transcribe", wav, "-e", "parakeet", "--json"], { cwd: work, encoding: "utf8" });
   // The result line names the file the words were written to, an array of {text, start, end}.
   const lines = (t.stdout ?? "").split("\n").filter((l) => l.startsWith("{")).map((l) => JSON.parse(l));
   const done = lines.find((l) => l.ok === true && l.transcriptPath);

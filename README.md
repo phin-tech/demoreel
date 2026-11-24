@@ -265,6 +265,16 @@ A clip shorter than its narration holds its last frame.
 video (from `demoreel export`) beside its narration as a teleprompter, and records takes to `audio/`. The take you pick
 is written to `audio/takes.json`, and demoreel uses it as that scene's `audio` unless the scene names a file itself.
 
+Each take changes how long its scene lasts, so export again after picking one. Either leave this running while you
+record, and it exports (at draft quality) whenever a take is picked or `demo.json` or a file a scene uses changes:
+
+```bash
+demoreel watch my-demo        # --full for full quality; --hd and --scenes are passed on; Ctrl+C stops
+```
+
+or press **Render** in Booth, which runs the export itself (tell it where demoreel is in Booth's Settings). Either way
+Booth reloads when the export lands.
+
 **Recorded or generated audio.** Put the file on the scene, `"audio": "intro.wav"` (anything ffmpeg reads), and demoreel
 measures it, sets the scene's length to fit with a short pause after, and mixes it into the video starting 0.3 seconds in
 (`"audioOffset"` changes that). No need to type `audioSeconds`. Every voice is brought to -16 LUFS first (a copy in `build/voice/`; your file is left alone), so a take
@@ -277,22 +287,41 @@ Keep the lines short. A long line over a still scene drags, and the fix is usual
 
 ```bash
 demoreel lint my-demo
+demoreel check my-demo
 ```
 
-This runs HyperFrames' own checks. Errors matter; the "sub-composition" warnings are suggestions you can ignore. Then
-look at actual frames, because a passing lint doesn't show how it looks:
+`lint` reads the page for HyperFrames' rules; `check` does that and then plays the film in a browser, looking for text
+that runs off the frame, poor contrast, long stretches where nothing moves, and audio problems. Errors matter; the
+"sub-composition" warnings are suggestions you can ignore, and `check`'s craft warnings are advice, not faults. Then
+look at actual frames, because a passing check doesn't show how it looks:
 
 ```bash
-ffmpeg -ss 3 -i my-demo/out/my-demo.mp4 -frames:v 1 frame.png
+demoreel snapshot my-demo              # a still from the middle of each scene, in out/snapshots/, no render needed
+demoreel snapshot my-demo --at 3,7.5   # the stills at those seconds
 ```
+
+While you work, `demoreel render my-demo --draft` renders at draft quality, a good deal faster; render without it for
+the copy you keep.
 
 ## 5. Export for an editor
 
 ```bash
-demoreel export my-demo --hd
+demoreel export my-demo
 ```
 
-`--hd` draws at 1080p (smaller files, quicker to upload); leave it off for 4K. This renders every scene alone and writes:
+This renders the film once, to `out/<name>.mp4`, with a chapter at each scene: QuickTime, IINA and VLC list them, so you
+can jump from scene to scene. A chapter is named after the scene's `title` (or its `kicker`, or its id); give a scene a
+`"chapter"` to name it something else. `out/chapters.txt` has the same times as `0:00 Title` lines, to paste into a
+YouTube description (YouTube makes chapters of them when there are three or more and each is at least ten seconds).
+`--hd` draws at 1080p (smaller files, quicker to upload); leave it off for 4K.
+
+For an editor that wants each scene as its own clip, such as Google Vids, add `--scenes`:
+
+```bash
+demoreel export my-demo --scenes
+```
+
+That renders every scene alone and writes:
 
 ```
 my-demo/out/vids/
@@ -305,8 +334,10 @@ Drag a scene's mp4 into Google Vids (or any editor), paste its `narration.txt` i
 scene's `voice.wav` and, if it has recorded audio (step 3), `captions.srt` with real timing: Parakeet transcribes the
 audio on this machine and the times are laid onto the words of your narration, so the text is what you meant and the
 timing is what was said. Install it once with `npx hyperframes models install parakeet`. Results are cached in `build/`,
-and a scene without audio gets no captions. `out/storyboard.md` and `out/manifest.json` (with each scene's length and
-on-screen cues) hold the whole plan, if you want it in one place.
+and a scene without audio gets no captions. Either way, `out/captions.srt` has the captions for the whole film, and
+`out/storyboard.md` and `out/manifest.json` (with each scene's length, where it starts and its on-screen cues) hold the
+whole plan. The manifest's `film` names the one file when there is one; without it, each scene's `file` is its own.
+Booth reads either.
 
 ## 6. Make a deck to click through
 
@@ -330,12 +361,16 @@ The deck is for presenting from your machine. Nothing here makes a file you can 
 ### A timeline for DaVinci Resolve or Final Cut
 
 ```bash
-demoreel export my-demo     # the scenes first
+demoreel export my-demo     # the film first (or with --scenes)
 demoreel timeline my-demo   # then out/timeline/
 ```
 
-`out/timeline/` holds an `.fcpxml` and the media it points at: each scene's video on the main track (silent), and each
-recorded voice on an audio track under its scene, starting where demoreel starts it. In DaVinci Resolve, which is free,
+`out/timeline/` holds an `.fcpxml` and the media it points at: each scene's video on the main track (silent), with a
+marker named after the scene where it starts and its narration as the clip's note, and each recorded voice on an audio
+track under its scene, starting where demoreel starts it. A take recorded in [Booth](https://github.com/phin-tech/booth)
+has a marker where each sentence of it starts, from the marks Booth keeps beside the take (`<take>.marks.json`), so you
+can see the script against the voice; they are left out if the narration has since changed. It is made from whichever export you ran last: after a plain `export` each scene is its stretch of
+the one film; after `export --scenes`, its own file. In DaVinci Resolve, which is free,
 use File > Import > Timeline; in Final Cut, File > Import > XML. `captions.srt` is there to import as subtitles.
 
 This is written as FCPXML 1.8 and checked only for well-formedness, not opened in Resolve or Final Cut, so if one
@@ -390,21 +425,39 @@ recorder (`crates/app/src/screenshot.rs`, `Recorder::note`), which is the refere
 ## Reference
 
 Top level of `demo.json`: `name` (output file name), `title`, `scenes`, `wordsPerMinute` (default 150), `fps` (30),
-`scale` (2 is 4K, 1 is 1080p; `--hd` sets 1), `theme` (`accent`, `ink`, `muted`, `font`, `background`).
+`scale` (2 is 4K, 1 is 1080p; `--hd` sets 1), `theme`, `motionBlur`, `loudness`.
 
-`bullets` scene: `id`, `branch`, `kicker`, `title`, `bullets`, `cards`, `duration`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
+`scale` is applied by HyperFrames when it renders (Chrome draws the 1920×1080 page at twice the pixels), so it has to
+give one of HyperFrames' sizes: 1920×1080, 1080×1920 or 1080×1080 at scale 1, the 4K version of each at scale 2, or
+2560×1440 and the like. demoreel says so before it renders anything else.
+
+`theme` is the film's look: `accent` (kickers, bullet dots, click rings), `ink` (text), `muted`, `surface` (the key caps),
+`font` (a CSS font stack) and `background` (any CSS background, a gradient included). Any scene can have a `theme` of its
+own with any of the same keys, and it changes only that scene. Each key is a HyperFrames variable as well, so a built film
+can be rendered in other colours without changing `demo.json`:
+`demoreel render my-demo --variables '{"accent":"#3a7be8"}'` (an unknown key or a bad colour stops the render).
+
+`"motionBlur": true` blurs the pointer as it glides from one click to the next, as a camera would. Nothing else blurs.
+
+`bullets` scene: `id`, `branch`, `kicker`, `title`, `bullets`, `cards`, `duration`, `chapter`, `theme`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
 Card: `image`, `x`, `y`, `width`, `delay`, `tilt`, `link`, `linkLabel`, `zoom` (`to`, `origin`, `at`, `duration`).
 
 `clip` scene: `id`, `video`, `events`, `window`, `card` (`x`, `y`, `width`; default 180, 70, 1560), `pointer` (`x`, `y` as
-fractions of the window where it starts; default 0.55, 0.6), `narration`, `audio`, `audioOffset`, `audioSeconds`.
+fractions of the window where it starts; default 0.55, 0.6), `chapter`, `theme`, `narration`, `audio`, `audioOffset`, `audioSeconds`.
 
-Commands: `demoreel build` writes the HTML only; `lint`; `render` (the whole film to `out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`.
+Commands: `demoreel build` writes the HTML only; `lint`; `check`; `snapshot` (`--at`); `render` (the whole film to
+`out/<name>.mp4`); `export`; `timeline`; `record`; `login`; `deck`; `present`. `render` and `export` take `--draft`,
+`--hd` and `--variables`, and `export` takes `--scenes`.
+
+demoreel runs the HyperFrames in its own `node_modules` (the version `package.json` pins) and turns off its update check
+each time, so HyperFrames doesn't update itself in the background and change what a film looks like.
 
 ## Troubleshooting
 
 - **A video in the render is frozen.** A `<video>` must not sit inside a timed element and needs an `id`; demoreel does
   this for you, so a hand edit to the generated HTML probably broke it. Run `demoreel lint`.
-- **Text looks fuzzy.** Use `scale: 2` (the default), keep screenshots at their real size, and don't zoom past about 1.25×.
+- **Text looks fuzzy.** Render without `--hd` and `--draft`, keep screenshots at their real size, and don't zoom past
+  about 1.25×.
 - **A click ring or key cap shows before it should.** In your own GSAP edits, use `gsap.set` then `tl.to`, never `fromTo`,
   which draws its first state immediately.
 - **`share`, `publish` and `auth`** are HyperFrames commands that upload to HeyGen's servers. demoreel never uses them.

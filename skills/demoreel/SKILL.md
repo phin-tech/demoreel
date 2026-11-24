@@ -24,18 +24,24 @@ installing this skill does not install the tool.
    does the same for a website.
 3. **Write `demo.json`.** `bullets` scenes (title, bullets, floating `cards`, optional `zoom`) and `clip` scenes (a video and
    its events). Put the narration in each scene.
-4. **Check, then render.** `demoreel lint <folder>`, then look at frames before calling it done: render, then pull stills
-   with `ffmpeg -ss <t> -i out/x.mp4 -frames:v 1 f.png` and read them. A passing lint does not show how it looks.
-5. **Hand off.** `demoreel export <folder>` writes `out/scenes/*.mp4`, `storyboard.md`, `manifest.json` (with each scene's
-   length and on-screen cues) and `captions.srt`. In Google Vids: new video, import the scene mp4s in order, paste each
-   scene's narration into its voice-over, add music, export. Captions come only from real audio (Parakeet, installed with
+4. **Check, then render.** `demoreel check <folder>` (lint, then the film played in a browser for layout, contrast and
+   audio), then look at frames before calling it done: `demoreel snapshot <folder>` saves a still from each scene in
+   `out/snapshots/` without rendering (`--at 3,7.5` for given seconds); read them. A passing check does not show how it
+   looks. Use `demoreel render <folder> --draft` while iterating and render without it for the copy to keep.
+5. **Hand off.** `demoreel export <folder>` writes the film to `out/<name>.mp4` with a chapter at each scene,
+   `chapters.txt` (for a YouTube description), `storyboard.md`, `manifest.json` (with each scene's length, start and
+   on-screen cues) and `captions.srt`. `--scenes` renders each scene to `out/scenes/*.mp4` instead, with a folder each in
+   `out/vids/`; use it for Google Vids: new video, import the scene mp4s in order, paste each scene's narration into its
+   voice-over, add music, export. Captions come only from real audio (Parakeet, installed with
    `npx hyperframes models install parakeet`).
 6. **Voice, if the person will record it.** [Booth](https://github.com/phin-tech/booth) opens the folder, plays each
-   exported scene beside its script and records takes to `audio/`; the take it marks is written to `audio/takes.json`
-   and demoreel uses it as the scene's audio (a scene's own `audio` file wins). Rebuild to fit the scenes to the audio.
+   exported scene (its stretch of the film, or its own file) beside its script and records takes to `audio/`; the take it marks is written to `audio/takes.json`
+   and demoreel uses it as the scene's audio (a scene's own `audio` file wins). Export again to fit the scenes to the
+   audio: `demoreel watch <folder>` does it on each change (draft quality), or Booth's Render button; Booth reloads
+   when an export finishes.
 7. **A timeline, if they want to finish in an editor.** `demoreel timeline <folder>` (after `export`) writes
-   `out/timeline/`: an FCPXML for DaVinci Resolve or Final Cut with the scenes silent on one track and each voice under
-   its scene. It has not been opened in those apps, so ask the person to try it and report any import error.
+   `out/timeline/`: an FCPXML for DaVinci Resolve or Final Cut with the scenes silent on one track, a named marker and
+   the narration as a note on each, and each voice under its scene, with a marker at each sentence of a Booth take. It has not been opened in those apps, so ask the person to try it and report any import error.
 8. **A deck, if they want to click through it.** `demoreel present <folder>` serves the same scenes as a slideshow
    (bullets one per press, narration as notes; a `branch` scene reached from a card's `link`). It stays running; stop it
    when done.

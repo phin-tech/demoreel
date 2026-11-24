@@ -1,33 +1,33 @@
 {
  "fps": 30,
- "frames": 220,
+ "frames": 229,
  "window": {
   "w": 1280,
   "h": 800
  },
  "events": [
   {
-   "frame": 47,
+   "frame": 51,
    "kind": "click",
    "x": 629.3,
    "y": 533.1,
    "held": ""
   },
   {
-   "frame": 82,
+   "frame": 86,
    "kind": "hover",
    "x": 640,
    "y": 300
   },
   {
-   "frame": 105,
+   "frame": 108,
    "kind": "scroll",
    "x": 640,
    "y": 400,
    "dy": 400
   },
   {
-   "frame": 159,
+   "frame": 163,
    "kind": "scroll",
    "x": 640,
    "y": 400,

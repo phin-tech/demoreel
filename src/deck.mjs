@@ -4,11 +4,9 @@
 import { writeFileSync, mkdirSync, rmSync, cpSync, copyFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { round } from "./util.mjs";
-import { build, textScene, clipScene, rules, cleanNarration } from "./build.mjs";
-
-const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { build, textScene, clipScene, rules, cleanNarration, themeVars } from "./build.mjs";
+import { GSAP } from "./hyperframes.mjs";
 
 function imageSize(file) {
   const r = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { encoding: "utf8" });
@@ -25,7 +23,7 @@ function slideFile(dir, cfg, s, id, length) {
   const { html, js } = s.type === "clip" ? clipScene(dir, cfg, scene, 0) : textScene(dir, cfg, scene, 0, { deck: true });
   return `<template>
   <style>
-    #${id} { position: absolute; inset: 0; --ink: ${t.ink}; --accent: ${t.accent}; --muted: ${t.muted}; font-family: ${t.font}; background: ${t.background}; overflow: hidden; }
+    #${id} { position: absolute; inset: 0; ${themeVars(t)} font-family: var(--font); background: var(--background); overflow: hidden; }
     #${id} .scene.clip { position: absolute; inset: 0; }
 ${rules}
   </style>
@@ -56,7 +54,7 @@ export function buildDeck(dir) {
       copyFileSync(join(dir, rel), join(out, rel));
     }
   }
-  copyFileSync(join(TOOL, "node_modules/hyperframes/dist/vendor/npm/gsap@3.15.0/dist/gsap.min.js"), join(out, "gsap.min.js"));
+  copyFileSync(GSAP, join(out, "gsap.min.js"));
 
   const id = (s) => `d${s.n}`;
   const main = cfg.scenes.filter((s) => !s.branch);

@@ -10,17 +10,16 @@
 // works too: give the scene a `.png`, `.jpg` or `.webp` and it is shown as it is.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, statSync, readFileSync, writeFileSync } from "node:fs";
-import { join, basename, extname, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, basename, extname } from "node:path";
+import { hyperframes } from "./hyperframes.mjs";
 
-const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
 const HUB_BLOCK = "compositions/components/constellation-hub.html";
 
 /** The constellation-hub block's files in the project, fetched from HyperFrames' registry the first time (it needs the
  *  network once; the files stay in the project after). */
 function fetchHubBlock(dir, s) {
   if (existsSync(join(dir, HUB_BLOCK))) return;
-  const r = spawnSync(join(TOOL, "node_modules/.bin/hyperframes"), ["add", "constellation-hub", "--no-clipboard", "--json", "--dir", dir], { encoding: "utf8" });
+  const r = hyperframes(["add", "constellation-hub", "--no-clipboard", "--json", "--dir", dir], { encoding: "utf8" });
   if (r.status !== 0 || !existsSync(join(dir, HUB_BLOCK))) {
     throw new Error(`scene ${s.id}: could not fetch HyperFrames' constellation-hub block (it needs the network once): ${r.stdout || r.stderr}`);
   }

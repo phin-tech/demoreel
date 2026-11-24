@@ -12,12 +12,15 @@
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
 import { sleep } from "./util.mjs";
+import { hyperframes } from "./hyperframes.mjs";
 import { applySession, bounced, captureSession, readSession, writeSession } from "./session.mjs";
 
-const TOOL = join(dirname(fileURLToPath(import.meta.url)), "..");
+// A frame is a JPEG at quality 95: at 2x a PNG takes about 120 ms to capture and this about 65, so twice as many frames
+// are caught while the page moves; next to the PNG it measures 44 dB, under what the video's own encoding loses.
+const SHOT = { format: "jpeg", quality: 95, optimizeForSpeed: true, captureBeyondViewport: false };
 const STEP_PAUSE = 120;
 const TYPE_PAUSE = 60;
 const CAPTURE_TIMEOUT = 1500; // ms before one screenshot is given up on (one in flight when the page navigates is never answered)
@@ -40,7 +43,7 @@ async function open(page, url) {
 
 export function findChrome() {
   if (process.env.DEMOREEL_CHROME) return process.env.DEMOREEL_CHROME;
-  const r = spawnSync(join(TOOL, "node_modules/.bin/hyperframes"), ["browser", "path"], { encoding: "utf8" });
+  const r = hyperframes(["browser", "path"], { encoding: "utf8" });
   const path = (r.stdout ?? "").trim().split("\n").pop();
   if (r.status !== 0 || !path) throw new Error("no Chrome found: run `npx hyperframes browser ensure`, or set DEMOREEL_CHROME to a Chrome binary");
   return path;
@@ -93,6 +96,9 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     // the next, and later made into a steady rate. (Chrome's screencast ignores the device scale and comes out soft.)
     // This is CDP's own capture and not page.screenshot, which takes focus from the page it is filming, so typing is lost.
     const cdp = await page.createCDPSession();
+    // Chrome keeps the device scale per session, and a session of its own captures at 1x unless it is told the scale too
+    // (the page's layout is unchanged: the same viewport, at the same scale).
+    await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: scale, mobile: false });
     const shown = []; // { t, file }
     let recording = true;
     // A capture that stalls (Chrome can hang one while a page is navigating) or fails is skipped and the last frame held;
@@ -100,9 +106,9 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     let failures = 0;
     const grab = async () => {
       const t = Date.now() / 1000;
-      const file = join(work, `shot-${String(shown.length).padStart(6, "0")}.png`);
+      const file = join(work, `shot-${String(shown.length).padStart(6, "0")}.jpg`);
       try {
-        const { data } = await withTimeout(cdp.send("Page.captureScreenshot", { format: "png", optimizeForSpeed: true, captureBeyondViewport: false }), CAPTURE_TIMEOUT);
+        const { data } = await withTimeout(cdp.send("Page.captureScreenshot", SHOT), CAPTURE_TIMEOUT);
         writeFileSync(file, Buffer.from(data, "base64"));
         shown.push({ t, file });
         failures = 0;
@@ -188,10 +194,10 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     let at = 0;
     for (let k = 0; k < total; k++) {
       while (at + 1 < shown.length && shown[at + 1].t <= t0 + k / fps) at++;
-      linkSync(shown[at].file, join(out, `${String(k).padStart(5, "0")}.png`));
+      linkSync(shown[at].file, join(out, `${String(k).padStart(5, "0")}.jpg`));
     }
     mkdirSync(dirname(video), { recursive: true });
-    const enc = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(out, "%05d.png"),
+    const enc = spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", join(out, "%05d.jpg"),
       "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p", video], { encoding: "utf8" });
     if (enc.status !== 0) throw new Error(`ffmpeg could not make the video: ${enc.stderr}`);
     writeFileSync(eventsFile, JSON.stringify({ fps, frames: total, window: { w: viewport.width, h: viewport.height }, events }, null, 1) + "\n");
