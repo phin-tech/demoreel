@@ -1,13 +1,13 @@
 {
  "fps": 30,
- "frames": 211,
+ "frames": 210,
  "window": {
   "w": 1280,
   "h": 800
  },
  "events": [
   {
-   "frame": 23,
+   "frame": 24,
    "kind": "click",
    "x": 237.3,
    "y": 354.9,
@@ -28,14 +28,14 @@
    "held": ""
   },
   {
-   "frame": 124,
+   "frame": 123,
    "kind": "click",
    "x": 1184,
    "y": 175,
    "held": ""
   },
   {
-   "frame": 152,
+   "frame": 150,
    "kind": "click",
    "x": 1184,
    "y": 175,
