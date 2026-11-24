@@ -482,7 +482,8 @@ written that way still fits after the script changes. `"fit": true` leaves out t
 happens (a second after each event and half a second before the next are kept) until the clip lasts about as long as its
 narration.
 
-A clip can be heard as well as seen. A recording's `sound` events (an app's driver notes what it plays, as Booth's does)
+A menu item a script chooses (a `menu` event) is shown as a cap, `Voice › Generate Take`, since a menu is drawn outside
+the window and isn't in the frames. A clip can be heard as well as seen. A recording's `sound` events (an app's driver notes what it plays, as Booth's does)
 name the files, which `demoreel record` copies beside the clip into `<id>.sounds/`; a scene's own `"sounds"` list adds
 more: `{ "at": 17, "file": "ding.wav", "from": 0, "seconds": 2 }`, with `at` a time like `from`'s. Each plays at its
 place in the clip as trimmed, until its stretch ends, levelled 3 dB under the narration.

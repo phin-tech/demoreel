@@ -510,6 +510,14 @@ export function clipScene(dir, cfg, s, t0) {
       return;
     }
     if (e.kind === "sound") return;
+    if (e.kind === "menu") {
+      // A menu is drawn outside the window, so the item chosen is shown as a cap: Voice › Generate Take.
+      const path = String(e.path ?? "").split(/\s*>\s*/).map(esc).join(" <span class=\"sep\">›</span> ");
+      keys += `<div class="keyset" id="${id}k${i}"><div class="cap menu">${path}</div></div>`;
+      js.push(`gsap.set("#${id}k${i}",{opacity:0,y:14});`);
+      js.push(`tl.to("#${id}k${i}",{opacity:1,y:0,duration:.2,ease:"power2.out"},${round(t)});tl.to("#${id}k${i}",{opacity:0,duration:.3},${round(t + 1.8)});`);
+      return;
+    }
     if (e.kind === "skip") {
       // Time left out: a tag in the clip's corner for a moment, so the cut reads as a jump and not a glitch.
       skips += `<div class="skipped" id="${id}j${i}"${still(cfg)} style="left:${round(card.x + card.width - 24)}px;top:${round(card.y + 24)}px">⏩ ${skipLabel(e.seconds)} later</div>`;
@@ -566,6 +574,7 @@ export const rules = `      .scene { font-family: var(--font); }
       .card img, .card video { width: 100%; display: block; }
       .clipvideo { position: absolute; object-fit: cover; border-radius: 18px; box-shadow: 0 40px 90px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.08); }
       .clipvideo.full { object-fit: contain; border-radius: 0; box-shadow: none; background: #000; }
+      .cap.menu { font-size: 32px; font-weight: 500; } .cap.menu .sep { opacity: .55; padding: 0 4px; }
       .skipped { position: absolute; transform: translateX(-100%); padding: 10px 20px; border-radius: 14px; font-size: 30px; font-weight: 600;
         color: var(--ink); background: var(--surface); border: 1px solid rgba(255,255,255,.16); box-shadow: 0 8px 24px rgba(0,0,0,.5); white-space: nowrap; }
       .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
@@ -691,7 +700,7 @@ export function cues(s) {
   if (s.type === "clip") {
     const fps = s.events.fps ?? 30;
     for (const e of s.events.events) {
-      const label = e.kind === "key" ? `key ${e.key}` : e.kind === "skip" ? `skip ${skipLabel(e.seconds)}` : e.kind === "sound" ? "sound" : e.kind;
+      const label = e.kind === "key" ? `key ${e.key}` : e.kind === "skip" ? `skip ${skipLabel(e.seconds)}` : e.kind === "sound" ? "sound" : e.kind === "menu" ? `menu ${e.path}` : e.kind;
       out.push({ t: round(e.frame / fps), label });
     }
   } else {
