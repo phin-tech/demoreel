@@ -96,9 +96,9 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
     // the next, and later made into a steady rate. (Chrome's screencast ignores the device scale and comes out soft.)
     // This is CDP's own capture and not page.screenshot, which takes focus from the page it is filming, so typing is lost.
     const cdp = await page.createCDPSession();
-    // Chrome keeps the device scale per session, and a session of its own captures at 1x unless it is told the scale too
-    // (the page's layout is unchanged: the same viewport, at the same scale).
-    await cdp.send("Emulation.setDeviceMetricsOverride", { ...viewport, deviceScaleFactor: scale, mobile: false });
+    // A session of its own captures at 1x, so each capture asks for the page's scale through its clip. (Overriding the
+    // device metrics on this session instead puts every mouse event at the wrong scale: a click lands at half its x and y.)
+    const shot = { ...SHOT, clip: { x: 0, y: 0, width: viewport.width, height: viewport.height, scale } };
     const shown = []; // { t, file }
     let recording = true;
     // A capture that stalls (Chrome can hang one while a page is navigating) or fails is skipped and the last frame held;
@@ -108,7 +108,7 @@ export async function recordWeb(dir, scene, { log = console.log } = {}) {
       const t = Date.now() / 1000;
       const file = join(work, `shot-${String(shown.length).padStart(6, "0")}.jpg`);
       try {
-        const { data } = await withTimeout(cdp.send("Page.captureScreenshot", SHOT), CAPTURE_TIMEOUT);
+        const { data } = await withTimeout(cdp.send("Page.captureScreenshot", shot), CAPTURE_TIMEOUT);
         writeFileSync(file, Buffer.from(data, "base64"));
         shown.push({ t, file });
         failures = 0;
